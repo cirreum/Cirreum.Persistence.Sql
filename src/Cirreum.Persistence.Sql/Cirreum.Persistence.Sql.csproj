@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<RootNamespace>Cirreum.Persistence</RootNamespace>
+		<Description>Dapper persistence provider for Cirreum framework</Description>
+		<PackageTags>persistence,sql,dapper</PackageTags>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Cirreum.Exceptions" Version="1.0.0" />
+		<PackageReference Include="Cirreum.Result" Version="1.0.9" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Update="Extensions\DbResultTAccumulatorExtensions.tt">
+	    <Generator>TextTemplatingFileGenerator</Generator>
+	    <LastGenOutput>DbResultTAccumulatorExtensions.g.cs</LastGenOutput>
+	  </None>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Compile Update="Extensions\DbResultTAccumulatorExtensions.g.cs">
+	    <DesignTime>True</DesignTime>
+	    <AutoGen>True</AutoGen>
+	    <DependentUpon>DbResultTAccumulatorExtensions.tt</DependentUpon>
+	  </Compile>
+	</ItemGroup>
+
+</Project>
