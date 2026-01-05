@@ -12,7 +12,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="Cirreum.Exceptions" Version="1.0.0" />
-		<PackageReference Include="Cirreum.Result" Version="1.0.9" />
+		<PackageReference Include="Cirreum.Result" Version="1.0.10" />
 	</ItemGroup>
 
 	<ItemGroup>

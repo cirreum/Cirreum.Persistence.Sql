@@ -19,7 +19,7 @@ The library offers Result-oriented extension methods for common data access patt
 - **Database Agnostic** - Works with SQL Server, SQLite, PostgreSQL, MySQL, and any ADO.NET provider
 - **Connection Factory Pattern** - Clean `ISqlConnectionFactory` abstraction for database connections
 - **Result Integration** - Extension methods that return `Result<T>` for railway-oriented programming
-- **Pagination Support** - Built-in support for offset (`PagedResult<T>`), cursor (`CursorResult<T>`), and slice (`SliceResult<T>`) pagination
+- **Pagination Support** - Extension methods for offset, cursor, and slice pagination (using `PagedResult<T>`, `CursorResult<T>`, and `SliceResult<T>` from [Cirreum.Result](https://github.com/cirreum/Cirreum.Result))
 - **Constraint Handling** - Automatic detection and conversion of constraint violations to typed Result failures across all supported databases
 - **Fluent Transactions** - Chain multiple database operations in a single transaction with railway-oriented error handling
 - **Multiple Result Sets** - Support for queries returning multiple result sets via `IMultipleResult`
@@ -232,6 +232,8 @@ public async Task<Result<OrderWithItems>> GetOrderWithItemsAsync(Guid orderId, C
 ```
 
 ## Pagination
+
+This library provides query extension methods that return pagination result types from [Cirreum.Result](https://github.com/cirreum/Cirreum.Result). The result types (`PagedResult<T>`, `CursorResult<T>`, `SliceResult<T>`, and `Cursor`) are defined in the base layer, while this library provides the SQL query extensions to populate them.
 
 ### Offset Pagination (PagedResult)
 
