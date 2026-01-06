@@ -211,9 +211,7 @@ Use multiple result queries when your SQL returns multiple result sets that need
 ```csharp
 public async Task<Result<OrderWithItems>> GetOrderWithItemsAsync(Guid orderId, CancellationToken ct)
 {
-    await using var conn = await db.CreateConnectionAsync(ct);
-
-    return await conn.MultipleGetAsync<OrderWithItems>(
+    return await db.MultipleGetAsync<OrderWithItems>(
         """
         SELECT * FROM Orders WHERE OrderId = @OrderId;
         SELECT * FROM OrderItems WHERE OrderId = @OrderId;
@@ -230,6 +228,8 @@ public async Task<Result<OrderWithItems>> GetOrderWithItemsAsync(Guid orderId, C
         ct);
 }
 ```
+
+Also available: `MultipleGetOptionalAsync` (returns `Optional<T>` when mapper returns null) and `MultipleQueryAnyAsync` (for queries returning lists).
 
 ## Pagination
 
@@ -413,27 +413,23 @@ Use the `*WithCountAsync` variants when you need the number of affected rows and
 // Update and get affected row count
 public async Task<Result<int>> MarkOrdersShippedAsync(Guid customerId, CancellationToken ct)
 {
-    await using var conn = await db.CreateConnectionAsync(ct);
-
-    return await conn.UpdateWithCountAsync(
+    return await db.UpdateWithCountAsync(
         """
         UPDATE Orders
         SET Status = 'Shipped', ShippedAt = @ShippedAt
         WHERE CustomerId = @CustomerId AND Status = 'Pending'
         """,
         new { CustomerId = customerId, ShippedAt = DateTime.UtcNow },
-        ct);
+        cancellationToken: ct);
 }
 
 // Delete and get affected row count
 public async Task<Result<int>> PurgeOldOrdersAsync(DateTime cutoff, CancellationToken ct)
 {
-    await using var conn = await db.CreateConnectionAsync(ct);
-
-    return await conn.DeleteWithCountAsync(
+    return await db.DeleteWithCountAsync(
         "DELETE FROM Orders WHERE CreatedAt < @Cutoff AND Status = 'Completed'",
         new { Cutoff = cutoff },
-        ct);
+        cancellationToken: ct);
 }
 ```
 

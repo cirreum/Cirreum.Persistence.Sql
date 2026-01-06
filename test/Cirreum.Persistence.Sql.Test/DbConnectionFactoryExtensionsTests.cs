@@ -661,11 +661,386 @@ public sealed class DbConnectionFactoryExtensionsTests {
 
 	#endregion
 
+	#region MultipleGetAsync
+
+	[TestMethod]
+	public async Task MultipleGetAsync_ReturnsValue_WhenMapperReturnsValue() {
+		// Arrange
+		var userId = Guid.NewGuid().ToString();
+		await this._factory.InsertAsync(
+			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId, Name = "John", Email = "john@test.com" },
+			cancellationToken: this.TestContext.CancellationToken);
+		await this._factory.InsertAsync(
+			"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
+			new { Id = Guid.NewGuid().ToString(), UserId = userId, Amount = 100.0 },
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Act
+		var result = await this._factory.MultipleGetAsync<UserWithOrders>(
+			"""
+			SELECT Id, Name, Email FROM Users WHERE Id = @Id;
+			SELECT Id, UserId, Amount FROM Orders WHERE UserId = @Id;
+			""",
+			new { Id = userId },
+			[userId],
+			async reader => {
+				var user = await reader.ReadSingleOrDefaultAsync<UserDto>();
+				if (user is null) return null;
+				var orders = (await reader.ReadAsync<OrderDto>()).ToList();
+				return new UserWithOrders(user, orders);
+			},
+			this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual("John", result.Value.User.Name);
+		Assert.HasCount(1, result.Value.Orders);
+	}
+
+	[TestMethod]
+	public async Task MultipleGetAsync_ReturnsNotFound_WhenMapperReturnsNull() {
+		// Act
+		var result = await this._factory.MultipleGetAsync<UserWithOrders>(
+			"""
+			SELECT Id, Name, Email FROM Users WHERE Id = @Id;
+			SELECT Id, UserId, Amount FROM Orders WHERE UserId = @Id;
+			""",
+			new { Id = "nonexistent" },
+			["nonexistent"],
+			async reader => {
+				var user = await reader.ReadSingleOrDefaultAsync<UserDto>();
+				if (user is null) return null;
+				var orders = (await reader.ReadAsync<OrderDto>()).ToList();
+				return new UserWithOrders(user, orders);
+			},
+			this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsFailure);
+		Assert.IsInstanceOfType<NotFoundException>(result.Error);
+	}
+
+	[TestMethod]
+	public async Task MultipleGetAsync_WithoutParameters_Works() {
+		// Arrange
+		await this._factory.InsertAsync(
+			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = Guid.NewGuid().ToString(), Name = "John", Email = "john@test.com" },
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Act
+		var result = await this._factory.MultipleGetAsync<int>(
+			"SELECT COUNT(*) FROM Users; SELECT COUNT(*) FROM Orders;",
+			["counts"],
+			async reader => {
+				var userCount = await reader.ReadSingleOrDefaultAsync<int>();
+				var orderCount = await reader.ReadSingleOrDefaultAsync<int>();
+				return userCount + orderCount;
+			},
+			this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual(1, result.Value);
+	}
+
+	#endregion
+
+	#region MultipleGetOptionalAsync
+
+	[TestMethod]
+	public async Task MultipleGetOptionalAsync_ReturnsOptionalWithValue_WhenMapperReturnsValue() {
+		// Arrange
+		var userId = Guid.NewGuid().ToString();
+		await this._factory.InsertAsync(
+			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId, Name = "John", Email = "john@test.com" },
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Act
+		var result = await this._factory.MultipleGetOptionalAsync<UserDto>(
+			"SELECT Id, Name, Email FROM Users WHERE Id = @Id;",
+			new { Id = userId },
+			async reader => await reader.ReadSingleOrDefaultAsync<UserDto>(),
+			this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.IsTrue(result.Value.HasValue);
+		Assert.AreEqual("John", result.Value.Value.Name);
+	}
+
+	[TestMethod]
+	public async Task MultipleGetOptionalAsync_ReturnsEmptyOptional_WhenMapperReturnsNull() {
+		// Act
+		var result = await this._factory.MultipleGetOptionalAsync<UserDto>(
+			"SELECT Id, Name, Email FROM Users WHERE Id = @Id;",
+			new { Id = "nonexistent" },
+			async reader => await reader.ReadSingleOrDefaultAsync<UserDto>(),
+			this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.IsFalse(result.Value.HasValue);
+	}
+
+	[TestMethod]
+	public async Task MultipleGetOptionalAsync_WithoutParameters_Works() {
+		// Act
+		var result = await this._factory.MultipleGetOptionalAsync<int>(
+			"SELECT COUNT(*) FROM Users;",
+			async reader => await reader.ReadSingleOrDefaultAsync<int>(),
+			this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.IsTrue(result.Value.HasValue);
+		Assert.AreEqual(0, result.Value.Value);
+	}
+
+	#endregion
+
+	#region MultipleQueryAnyAsync
+
+	[TestMethod]
+	public async Task MultipleQueryAnyAsync_ReturnsList_WhenMapperReturnsList() {
+		// Arrange
+		var userId = Guid.NewGuid().ToString();
+		await this._factory.InsertAsync(
+			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId, Name = "John", Email = "john@test.com" },
+			cancellationToken: this.TestContext.CancellationToken);
+		await this._factory.InsertAsync(
+			"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
+			new { Id = Guid.NewGuid().ToString(), UserId = userId, Amount = 100.0 },
+			cancellationToken: this.TestContext.CancellationToken);
+		await this._factory.InsertAsync(
+			"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
+			new { Id = Guid.NewGuid().ToString(), UserId = userId, Amount = 200.0 },
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Act
+		var result = await this._factory.MultipleQueryAnyAsync<OrderDto>(
+			"SELECT Id, UserId, Amount FROM Orders WHERE UserId = @UserId;",
+			new { UserId = userId },
+			async reader => [.. (await reader.ReadAsync<OrderDto>())],
+			this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.HasCount(2, result.Value);
+	}
+
+	[TestMethod]
+	public async Task MultipleQueryAnyAsync_ReturnsEmptyList_WhenNoResults() {
+		// Act
+		var result = await this._factory.MultipleQueryAnyAsync<OrderDto>(
+			"SELECT Id, UserId, Amount FROM Orders WHERE UserId = @UserId;",
+			new { UserId = "nonexistent" },
+			async reader => [.. (await reader.ReadAsync<OrderDto>())],
+			this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.IsEmpty(result.Value);
+	}
+
+	[TestMethod]
+	public async Task MultipleQueryAnyAsync_WithoutParameters_Works() {
+		// Arrange
+		await this._factory.InsertAsync(
+			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = Guid.NewGuid().ToString(), Name = "User1", Email = "user1@test.com" },
+			cancellationToken: this.TestContext.CancellationToken);
+		await this._factory.InsertAsync(
+			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = Guid.NewGuid().ToString(), Name = "User2", Email = "user2@test.com" },
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Act
+		var result = await this._factory.MultipleQueryAnyAsync<UserDto>(
+			"SELECT Id, Name, Email FROM Users;",
+			async reader => [.. (await reader.ReadAsync<UserDto>())],
+			this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.HasCount(2, result.Value);
+	}
+
+	#endregion
+
+	#region InsertWithCountAsync
+
+	[TestMethod]
+	public async Task InsertWithCountAsync_ReturnsRowCount_WhenInsertSucceeds() {
+		// Arrange
+		var userId = Guid.NewGuid().ToString();
+
+		// Act
+		var result = await this._factory.InsertWithCountAsync(
+			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId, Name = "John", Email = "john@test.com" },
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual(1, result.Value);
+	}
+
+	[TestMethod]
+	public async Task InsertWithCountAsync_ReturnsZero_WhenConditionalInsertMatchesNothing() {
+		// Arrange
+		var userId = Guid.NewGuid().ToString();
+		await this._factory.InsertAsync(
+			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId, Name = "John", Email = "john@test.com" },
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Act - Try to insert only if email doesn't exist (it does, so 0 rows)
+		var result = await this._factory.InsertWithCountAsync(
+			"""
+			INSERT INTO Users (Id, Name, Email)
+			SELECT @Id, @Name, @Email
+			WHERE NOT EXISTS (SELECT 1 FROM Users WHERE Email = @Email)
+			""",
+			new { Id = Guid.NewGuid().ToString(), Name = "Jane", Email = "john@test.com" },
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual(0, result.Value);
+	}
+
+	#endregion
+
+	#region UpdateWithCountAsync
+
+	[TestMethod]
+	public async Task UpdateWithCountAsync_ReturnsRowCount_WhenUpdateSucceeds() {
+		// Arrange
+		var userId = Guid.NewGuid().ToString();
+		await this._factory.InsertAsync(
+			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId, Name = "John", Email = "john@test.com" },
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Act
+		var result = await this._factory.UpdateWithCountAsync(
+			"UPDATE Users SET Name = @Name WHERE Id = @Id",
+			new { Id = userId, Name = "Johnny" },
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual(1, result.Value);
+	}
+
+	[TestMethod]
+	public async Task UpdateWithCountAsync_ReturnsZero_WhenNoRowsMatch() {
+		// Act
+		var result = await this._factory.UpdateWithCountAsync(
+			"UPDATE Users SET Name = @Name WHERE Id = @Id",
+			new { Id = Guid.NewGuid().ToString(), Name = "Johnny" },
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual(0, result.Value);
+	}
+
+	[TestMethod]
+	public async Task UpdateWithCountAsync_ReturnsMultiple_WhenMultipleRowsMatch() {
+		// Arrange
+		await this._factory.InsertAsync(
+			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = Guid.NewGuid().ToString(), Name = "John", Email = "john1@test.com" },
+			cancellationToken: this.TestContext.CancellationToken);
+		await this._factory.InsertAsync(
+			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = Guid.NewGuid().ToString(), Name = "John", Email = "john2@test.com" },
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Act
+		var result = await this._factory.UpdateWithCountAsync(
+			"UPDATE Users SET Name = @NewName WHERE Name = @OldName",
+			new { OldName = "John", NewName = "Johnny" },
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual(2, result.Value);
+	}
+
+	#endregion
+
+	#region DeleteWithCountAsync
+
+	[TestMethod]
+	public async Task DeleteWithCountAsync_ReturnsRowCount_WhenDeleteSucceeds() {
+		// Arrange
+		var userId = Guid.NewGuid().ToString();
+		await this._factory.InsertAsync(
+			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId, Name = "John", Email = "john@test.com" },
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Act
+		var result = await this._factory.DeleteWithCountAsync(
+			"DELETE FROM Users WHERE Id = @Id",
+			new { Id = userId },
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual(1, result.Value);
+	}
+
+	[TestMethod]
+	public async Task DeleteWithCountAsync_ReturnsZero_WhenNoRowsMatch() {
+		// Act
+		var result = await this._factory.DeleteWithCountAsync(
+			"DELETE FROM Users WHERE Id = @Id",
+			new { Id = Guid.NewGuid().ToString() },
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual(0, result.Value);
+	}
+
+	[TestMethod]
+	public async Task DeleteWithCountAsync_ReturnsMultiple_WhenMultipleRowsMatch() {
+		// Arrange
+		await this._factory.InsertAsync(
+			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = Guid.NewGuid().ToString(), Name = "John", Email = "john1@test.com" },
+			cancellationToken: this.TestContext.CancellationToken);
+		await this._factory.InsertAsync(
+			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = Guid.NewGuid().ToString(), Name = "John", Email = "john2@test.com" },
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Act
+		var result = await this._factory.DeleteWithCountAsync(
+			"DELETE FROM Users WHERE Name = @Name",
+			new { Name = "John" },
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual(2, result.Value);
+	}
+
+	#endregion
+
 	#region Test DTOs
 
 	private record UserDto(string Id, string Name, string Email);
 	private record User(string Id, string Name, string Email);
 	private record OrderDto(string Id, string UserId, double Amount);
+	private record UserWithOrders(UserDto User, IReadOnlyList<OrderDto> Orders);
 
 	public TestContext TestContext { get; set; }
 

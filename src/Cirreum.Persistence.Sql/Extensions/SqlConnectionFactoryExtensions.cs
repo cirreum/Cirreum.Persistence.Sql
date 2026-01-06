@@ -1543,6 +1543,259 @@ public static class SqlConnectionFactoryExtensions {
 
 		#endregion
 
+		#region INSERT WITH COUNT
+
+		/// <summary>
+		/// Executes an INSERT command and returns the number of rows affected.
+		/// </summary>
+		/// <remarks>
+		/// <para>
+		/// Use this method when you want to know how many rows were inserted and treat 0 as a valid outcome
+		/// (e.g., conditional inserts like INSERT...WHERE NOT EXISTS).
+		/// Unique constraint violations become <see cref="AlreadyExistsException"/> (HTTP 409).
+		/// Foreign key violations become <see cref="BadRequestException"/> (HTTP 400).
+		/// </para>
+		/// </remarks>
+		/// <param name="sql">The SQL INSERT statement to execute.</param>
+		/// <param name="parameters">An object containing the parameters to be passed to the SQL command, or <see langword="null"/> if no parameters are required.</param>
+		/// <param name="uniqueConstraintMessage">The error message to use if a unique constraint violation occurs.</param>
+		/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task representing the asynchronous operation. The result contains a <see cref="Result{T}"/> with the number of rows affected.</returns>
+		public async Task<Result<int>> InsertWithCountAsync(
+			string sql,
+			object? parameters = null,
+			string uniqueConstraintMessage = "Record already exists",
+			string? foreignKeyMessage = "Referenced record does not exist",
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.InsertWithCountAsync(
+				sql,
+				parameters,
+				uniqueConstraintMessage,
+				foreignKeyMessage,
+				transaction: null,
+				cancellationToken: cancellationToken);
+		}
+
+		#endregion
+
+		#region UPDATE WITH COUNT
+
+		/// <summary>
+		/// Executes an UPDATE command and returns the number of rows affected.
+		/// </summary>
+		/// <remarks>
+		/// <para>
+		/// Use this method when you want to know how many rows were updated and treat 0 as a valid outcome
+		/// (e.g., conditional updates or "update if exists" patterns).
+		/// Unique constraint violations become <see cref="AlreadyExistsException"/> (HTTP 409).
+		/// Foreign key violations become <see cref="BadRequestException"/> (HTTP 400).
+		/// </para>
+		/// </remarks>
+		/// <param name="sql">The SQL UPDATE statement to execute.</param>
+		/// <param name="parameters">An object containing the parameters to be passed to the SQL command, or <see langword="null"/> if no parameters are required.</param>
+		/// <param name="uniqueConstraintMessage">The error message to use if a unique constraint violation occurs.</param>
+		/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task representing the asynchronous operation. The result contains a <see cref="Result{T}"/> with the number of rows affected.</returns>
+		public async Task<Result<int>> UpdateWithCountAsync(
+			string sql,
+			object? parameters = null,
+			string uniqueConstraintMessage = "Record already exists",
+			string? foreignKeyMessage = "Referenced record does not exist",
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.UpdateWithCountAsync(
+				sql,
+				parameters,
+				uniqueConstraintMessage,
+				foreignKeyMessage,
+				transaction: null,
+				cancellationToken: cancellationToken);
+		}
+
+		#endregion
+
+		#region DELETE WITH COUNT
+
+		/// <summary>
+		/// Executes a DELETE command and returns the number of rows affected.
+		/// </summary>
+		/// <remarks>
+		/// <para>
+		/// Use this method when you want to know how many rows were deleted and treat 0 as a valid outcome
+		/// (e.g., "delete if exists" patterns).
+		/// Foreign key violations become <see cref="BadRequestException"/> (HTTP 400).
+		/// </para>
+		/// </remarks>
+		/// <param name="sql">The SQL DELETE statement to execute.</param>
+		/// <param name="parameters">An object containing the parameters to be passed to the SQL command, or <see langword="null"/> if no parameters are required.</param>
+		/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task representing the asynchronous operation. The result contains a <see cref="Result{T}"/> with the number of rows affected.</returns>
+		public async Task<Result<int>> DeleteWithCountAsync(
+			string sql,
+			object? parameters = null,
+			string foreignKeyMessage = "Cannot delete, record is in use",
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.DeleteWithCountAsync(
+				sql,
+				parameters,
+				foreignKeyMessage,
+				transaction: null,
+				cancellationToken: cancellationToken);
+		}
+
+		#endregion
+
+		#region MULTIPLE GET
+
+		/// <summary>
+		/// Executes a query returning multiple result sets and processes them using the provided mapper.
+		/// Returns a failure with <see cref="NotFoundException"/> if the mapper returns null.
+		/// </summary>
+		/// <typeparam name="T">The type of the object to be returned.</typeparam>
+		/// <param name="sql">The SQL query to execute. Should return multiple result sets.</param>
+		/// <param name="keys">The keys used to identify the resource for the <see cref="NotFoundException"/>.</param>
+		/// <param name="mapper">An async function that reads from the <see cref="IMultipleResult"/> and returns the mapped value.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task representing the asynchronous operation. The result contains a <see cref="Result{T}"/> object with the
+		/// mapped value, or a NotFound result if the mapper returns null.</returns>
+		public async Task<Result<T>> MultipleGetAsync<T>(
+			string sql,
+			object[] keys,
+			Func<IMultipleResult, Task<T?>> mapper,
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.MultipleGetAsync(sql, null, keys, mapper, null, cancellationToken);
+		}
+
+		/// <summary>
+		/// Executes a query returning multiple result sets and processes them using the provided mapper.
+		/// Returns a failure with <see cref="NotFoundException"/> if the mapper returns null.
+		/// </summary>
+		/// <typeparam name="T">The type of the object to be returned.</typeparam>
+		/// <param name="sql">The SQL query to execute. Should return multiple result sets.</param>
+		/// <param name="parameters">An object containing the parameters to be passed to the SQL query, or <see langword="null"/> if no parameters are required.</param>
+		/// <param name="keys">The keys used to identify the resource for the <see cref="NotFoundException"/>.</param>
+		/// <param name="mapper">An async function that reads from the <see cref="IMultipleResult"/> and returns the mapped value.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task representing the asynchronous operation. The result contains a <see cref="Result{T}"/> object with the
+		/// mapped value, or a NotFound result if the mapper returns null.</returns>
+		public async Task<Result<T>> MultipleGetAsync<T>(
+			string sql,
+			object? parameters,
+			object[] keys,
+			Func<IMultipleResult, Task<T?>> mapper,
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.MultipleGetAsync(
+				sql,
+				parameters,
+				keys,
+				mapper,
+				transaction: null,
+				cancellationToken: cancellationToken);
+		}
+
+		#endregion
+
+		#region MULTIPLE GET OPTIONAL
+
+		/// <summary>
+		/// Executes a query returning multiple result sets and processes them using the provided mapper.
+		/// Returns an <see cref="Optional{T}"/> that is empty if the mapper returns null.
+		/// </summary>
+		/// <typeparam name="T">The type of the object to be returned.</typeparam>
+		/// <param name="sql">The SQL query to execute. Should return multiple result sets.</param>
+		/// <param name="mapper">An async function that reads from the <see cref="IMultipleResult"/> and returns the mapped value.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task representing the asynchronous operation. The result contains a <see cref="Result{T}"/>
+		/// with an <see cref="Optional{T}"/> that is empty if the mapper returns null, or contains the value otherwise.</returns>
+		public async Task<Result<Optional<T>>> MultipleGetOptionalAsync<T>(
+			string sql,
+			Func<IMultipleResult, Task<T?>> mapper,
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.MultipleGetOptionalAsync(sql, null, mapper, null, cancellationToken);
+		}
+
+		/// <summary>
+		/// Executes a query returning multiple result sets and processes them using the provided mapper.
+		/// Returns an <see cref="Optional{T}"/> that is empty if the mapper returns null.
+		/// </summary>
+		/// <typeparam name="T">The type of the object to be returned.</typeparam>
+		/// <param name="sql">The SQL query to execute. Should return multiple result sets.</param>
+		/// <param name="parameters">An object containing the parameters to be passed to the SQL query, or <see langword="null"/> if no parameters are required.</param>
+		/// <param name="mapper">An async function that reads from the <see cref="IMultipleResult"/> and returns the mapped value.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task representing the asynchronous operation. The result contains a <see cref="Result{T}"/>
+		/// with an <see cref="Optional{T}"/> that is empty if the mapper returns null, or contains the value otherwise.</returns>
+		public async Task<Result<Optional<T>>> MultipleGetOptionalAsync<T>(
+			string sql,
+			object? parameters,
+			Func<IMultipleResult, Task<T?>> mapper,
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.MultipleGetOptionalAsync(
+				sql,
+				parameters,
+				mapper,
+				transaction: null,
+				cancellationToken: cancellationToken);
+		}
+
+		#endregion
+
+		#region MULTIPLE QUERY ANY
+
+		/// <summary>
+		/// Executes a query returning multiple result sets and processes them using the provided mapper.
+		/// Returns the list from the mapper; an empty list is a valid result.
+		/// </summary>
+		/// <typeparam name="T">The type of the elements in the returned list.</typeparam>
+		/// <param name="sql">The SQL query to execute. Should return multiple result sets.</param>
+		/// <param name="mapper">An async function that reads from the <see cref="IMultipleResult"/> and returns the list.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task representing the asynchronous operation. The result contains a <see cref="Result{T}"/>
+		/// wrapping a read-only list of items (which may be empty).</returns>
+		public async Task<Result<IReadOnlyList<T>>> MultipleQueryAnyAsync<T>(
+			string sql,
+			Func<IMultipleResult, Task<IReadOnlyList<T>?>> mapper,
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.MultipleQueryAnyAsync(sql, null, mapper, null, cancellationToken);
+		}
+
+		/// <summary>
+		/// Executes a query returning multiple result sets and processes them using the provided mapper.
+		/// Returns the list from the mapper; an empty list is a valid result.
+		/// </summary>
+		/// <typeparam name="T">The type of the elements in the returned list.</typeparam>
+		/// <param name="sql">The SQL query to execute. Should return multiple result sets.</param>
+		/// <param name="parameters">An object containing the parameters to be passed to the SQL query, or <see langword="null"/> if no parameters are required.</param>
+		/// <param name="mapper">An async function that reads from the <see cref="IMultipleResult"/> and returns the list.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task representing the asynchronous operation. The result contains a <see cref="Result{T}"/>
+		/// wrapping a read-only list of items (which may be empty).</returns>
+		public async Task<Result<IReadOnlyList<T>>> MultipleQueryAnyAsync<T>(
+			string sql,
+			object? parameters,
+			Func<IMultipleResult, Task<IReadOnlyList<T>?>> mapper,
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.MultipleQueryAnyAsync(
+				sql,
+				parameters,
+				mapper,
+				transaction: null,
+				cancellationToken: cancellationToken);
+		}
+
+		#endregion
+
 	}
 
 }
