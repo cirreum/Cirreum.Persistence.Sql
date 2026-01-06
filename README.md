@@ -456,6 +456,151 @@ Use `*WithCountAsync` when you need the affected row count, or when zero affecte
 | DELETE | No rows affected | `NotFoundException` | 404 |
 | DELETE | FK violation | `ConflictException` | 409 |
 
+## CUD + SELECT in One Batch
+
+When you need to perform a CUD operation and immediately SELECT back the resulting row (to get server-generated values like auto-increment IDs, defaults, computed columns, or timestamps), use the `*AndGetAsync` methods. These execute both statements in a single database roundtrip with full constraint handling.
+
+### InsertAndGet
+
+```csharp
+// Insert and get back the created row with server-generated values
+public async Task<Result<Order>> CreateOrderAsync(CreateOrder command, CancellationToken ct)
+{
+    return await db.InsertAndGetAsync<Order>(
+        """
+        INSERT INTO Orders (CustomerId, Amount) VALUES (@CustomerId, @Amount);
+        SELECT * FROM Orders WHERE Id = SCOPE_IDENTITY();
+        """,
+        new { command.CustomerId, command.Amount },
+        uniqueConstraintMessage: "Order already exists",
+        foreignKeyMessage: "Customer not found",
+        ct);
+}
+
+// With mapper for data transformation
+public async Task<Result<OrderSummary>> CreateOrderAsync(CreateOrder command, CancellationToken ct)
+{
+    return await db.InsertAndGetAsync<OrderDto, OrderSummary>(
+        """
+        INSERT INTO Orders (CustomerId, Amount) VALUES (@CustomerId, @Amount);
+        SELECT * FROM Orders WHERE Id = SCOPE_IDENTITY();
+        """,
+        new { command.CustomerId, command.Amount },
+        dto => new OrderSummary(dto.Id, dto.Amount),
+        uniqueConstraintMessage: "Order already exists",
+        ct);
+}
+```
+
+### UpdateAndGet
+
+```csharp
+// Update and get back the updated row
+public async Task<Result<Order>> UpdateOrderAsync(UpdateOrder command, CancellationToken ct)
+{
+    return await db.UpdateAndGetAsync<Order>(
+        """
+        UPDATE Orders SET Amount = @Amount, UpdatedAt = GETUTCDATE() WHERE Id = @Id;
+        SELECT * FROM Orders WHERE Id = @Id;
+        """,
+        new { command.Id, command.Amount },
+        key: command.Id,  // For NotFoundException if not found
+        uniqueConstraintMessage: "Order reference conflict",
+        ct);
+}
+```
+
+### DeleteAndGet
+
+```csharp
+// Delete and return the deleted row (SQL Server OUTPUT clause)
+public async Task<Result<Order>> DeleteOrderAsync(Guid orderId, CancellationToken ct)
+{
+    return await db.DeleteAndGetAsync<Order>(
+        """
+        DELETE FROM Orders
+        OUTPUT DELETED.*
+        WHERE Id = @Id;
+        """,
+        new { Id = orderId },
+        key: orderId,
+        foreignKeyMessage: "Cannot delete order, it has line items",
+        ct);
+}
+
+// PostgreSQL RETURNING clause
+public async Task<Result<Order>> DeleteOrderAsync(Guid orderId, CancellationToken ct)
+{
+    return await db.DeleteAndGetAsync<Order>(
+        "DELETE FROM Orders WHERE Id = @Id RETURNING *;",
+        new { Id = orderId },
+        key: orderId,
+        ct);
+}
+```
+
+### Optional Variants
+
+For conditional operations where no row being returned is a valid outcome, use the `*Optional` variants with a mapper that receives `Optional<T>`:
+
+```csharp
+// Conditional insert - handle the "already exists" case without exception
+public async Task<Result<CreateResult>> CreateIfNotExistsAsync(CreateOrder command, CancellationToken ct)
+{
+    return await db.InsertAndGetOptionalAsync<OrderDto, CreateResult>(
+        """
+        INSERT INTO Orders (CustomerId, Amount)
+        SELECT @CustomerId, @Amount
+        WHERE NOT EXISTS (SELECT 1 FROM Orders WHERE CustomerId = @CustomerId AND Status = 'Pending');
+
+        SELECT * FROM Orders WHERE Id = SCOPE_IDENTITY();
+        """,
+        new { command.CustomerId, command.Amount },
+        opt => opt.HasValue
+            ? new CreateResult.Created(opt.Value)
+            : new CreateResult.AlreadyHadPending(),
+        ct);
+}
+```
+
+### Fluent Chaining
+
+The `*AndGet` methods integrate with fluent transaction chaining via `parametersFactory` to build parameters from the previous result:
+
+```csharp
+// Real-world pattern: Get customer, create order, update inventory - all in one transaction
+var result = await db.ExecuteTransactionAsync(ctx => ctx
+    .GetAsync<Customer>(
+        "SELECT * FROM Customers WHERE Id = @Id",
+        new { Id = customerId },
+        key: customerId)
+    .ThenInsertAndGetAsync<Order>(
+        """
+        INSERT INTO Orders (CustomerId, CustomerName, Amount) VALUES (@CustomerId, @CustomerName, @Amount);
+        SELECT * FROM Orders WHERE Id = SCOPE_IDENTITY();
+        """,
+        customer => new { CustomerId = customer.Id, CustomerName = customer.Name, Amount = 100m },
+        uniqueConstraintMessage: "Duplicate order")
+    .ThenUpdateAndGetAsync<Inventory>(
+        """
+        UPDATE Inventory SET Reserved = Reserved + @Quantity WHERE ProductId = @ProductId;
+        SELECT * FROM Inventory WHERE ProductId = @ProductId;
+        """,
+        order => new { order.ProductId, order.Quantity },
+        order => order.ProductId),  // keyFactory for NotFoundException
+    ct);
+
+// result is Result<Inventory>
+// - If any step fails, transaction rolls back, you get the first failure
+// - If all succeed, transaction commits, you get the final Inventory
+```
+
+**Chain behavior:**
+- If `GetAsync` fails (customer not found) → `Result<Inventory>.Fail(NotFoundException)`, nothing inserted
+- If `ThenInsertAndGetAsync` fails (constraint violation) → `Result<Inventory>.Fail(AlreadyExistsException)`, rollback
+- If `ThenUpdateAndGetAsync` fails (inventory not found) → `Result<Inventory>.Fail(NotFoundException)`, order rolled back
+- All succeed → `Result<Inventory>.Ok(inventory)`, transaction committed
+
 ## Fluent Transaction Chaining
 
 Chain multiple database operations in a single transaction with railway-oriented error handling. If any operation fails, subsequent operations are skipped and the error propagates.

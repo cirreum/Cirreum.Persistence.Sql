@@ -387,6 +387,202 @@ public readonly struct DbContext(
 
 	#endregion
 
+	#region Insert and Get
+
+	/// <summary>
+	/// Executes an INSERT command followed by a SELECT in a single batch and returns the selected row.
+	/// </summary>
+	/// <typeparam name="T">The type of the row to return.</typeparam>
+	/// <param name="sql">The SQL batch containing INSERT and SELECT statements.</param>
+	/// <param name="uniqueConstraintMessage">The error message to use if a unique constraint violation occurs.</param>
+	/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs.</param>
+	/// <returns>A <see cref="DbResult{T}"/> that can be chained with other database operations.</returns>
+	public DbResult<T> InsertAndGetAsync<T>(
+		string sql,
+		string uniqueConstraintMessage = "Record already exists",
+		string? foreignKeyMessage = "Referenced record does not exist")
+		=> new(this, connection.InsertAndGetAsync<T>(sql, null, uniqueConstraintMessage, foreignKeyMessage, transaction, cancellationToken));
+
+	/// <summary>
+	/// Executes an INSERT command followed by a SELECT in a single batch and returns the selected row.
+	/// </summary>
+	/// <typeparam name="T">The type of the row to return.</typeparam>
+	/// <param name="sql">The SQL batch containing INSERT and SELECT statements.</param>
+	/// <param name="parameters">An object containing the parameters to be passed to the SQL command.</param>
+	/// <param name="uniqueConstraintMessage">The error message to use if a unique constraint violation occurs.</param>
+	/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs.</param>
+	/// <returns>A <see cref="DbResult{T}"/> that can be chained with other database operations.</returns>
+	public DbResult<T> InsertAndGetAsync<T>(
+		string sql,
+		object? parameters,
+		string uniqueConstraintMessage = "Record already exists",
+		string? foreignKeyMessage = "Referenced record does not exist")
+		=> new(this, connection.InsertAndGetAsync<T>(sql, parameters, uniqueConstraintMessage, foreignKeyMessage, transaction, cancellationToken));
+
+	/// <summary>
+	/// Executes an INSERT command followed by a SELECT in a single batch and returns the selected row,
+	/// applying a mapping function to transform the result.
+	/// </summary>
+	/// <typeparam name="TData">The type of the row returned by the SQL query.</typeparam>
+	/// <typeparam name="TModel">The type of the object in the final result.</typeparam>
+	/// <param name="sql">The SQL batch containing INSERT and SELECT statements.</param>
+	/// <param name="parameters">An object containing the parameters to be passed to the SQL command.</param>
+	/// <param name="mapper">A function to transform the data row to the domain model.</param>
+	/// <param name="uniqueConstraintMessage">The error message to use if a unique constraint violation occurs.</param>
+	/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs.</param>
+	/// <returns>A <see cref="DbResult{T}"/> that can be chained with other database operations.</returns>
+	public DbResult<TModel> InsertAndGetAsync<TData, TModel>(
+		string sql,
+		object? parameters,
+		Func<TData, TModel> mapper,
+		string uniqueConstraintMessage = "Record already exists",
+		string? foreignKeyMessage = "Referenced record does not exist")
+		=> new(this, connection.InsertAndGetAsync(sql, parameters, mapper, uniqueConstraintMessage, foreignKeyMessage, transaction, cancellationToken));
+
+	/// <summary>
+	/// Executes an INSERT command followed by a SELECT in a single batch and returns an <see cref="Optional{T}"/>
+	/// containing the selected row if present, allowing the caller to handle the empty case via a mapper.
+	/// </summary>
+	/// <typeparam name="TData">The type of the row returned by the SQL query.</typeparam>
+	/// <typeparam name="TModel">The type of the object in the final result.</typeparam>
+	/// <param name="sql">The SQL batch containing INSERT and SELECT statements.</param>
+	/// <param name="parameters">An object containing the parameters to be passed to the SQL command.</param>
+	/// <param name="mapper">A function that receives an <see cref="Optional{T}"/> and returns the final result.</param>
+	/// <param name="uniqueConstraintMessage">The error message to use if a unique constraint violation occurs.</param>
+	/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs.</param>
+	/// <returns>A <see cref="DbResult{T}"/> that can be chained with other database operations.</returns>
+	public DbResult<TModel> InsertAndGetOptionalAsync<TData, TModel>(
+		string sql,
+		object? parameters,
+		Func<Optional<TData>, TModel> mapper,
+		string uniqueConstraintMessage = "Record already exists",
+		string? foreignKeyMessage = "Referenced record does not exist")
+		=> new(this, connection.InsertAndGetOptionalAsync(sql, parameters, mapper, uniqueConstraintMessage, foreignKeyMessage, transaction, cancellationToken));
+
+	#endregion
+
+	#region Update and Get
+
+	/// <summary>
+	/// Executes an UPDATE command followed by a SELECT in a single batch and returns the selected row.
+	/// </summary>
+	/// <typeparam name="T">The type of the row to return.</typeparam>
+	/// <param name="sql">The SQL batch containing UPDATE and SELECT statements.</param>
+	/// <param name="parameters">An object containing the parameters to be passed to the SQL command.</param>
+	/// <param name="key">The key of the entity being updated, used in the NotFoundException if no row is returned.</param>
+	/// <param name="uniqueConstraintMessage">The error message to use if a unique constraint violation occurs.</param>
+	/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs.</param>
+	/// <returns>A <see cref="DbResult{T}"/> that can be chained with other database operations.</returns>
+	public DbResult<T> UpdateAndGetAsync<T>(
+		string sql,
+		object? parameters,
+		object key,
+		string uniqueConstraintMessage = "Record already exists",
+		string? foreignKeyMessage = "Referenced record does not exist")
+		=> new(this, connection.UpdateAndGetAsync<T>(sql, parameters, key, uniqueConstraintMessage, foreignKeyMessage, transaction, cancellationToken));
+
+	/// <summary>
+	/// Executes an UPDATE command followed by a SELECT in a single batch and returns the selected row,
+	/// applying a mapping function to transform the result.
+	/// </summary>
+	/// <typeparam name="TData">The type of the row returned by the SQL query.</typeparam>
+	/// <typeparam name="TModel">The type of the object in the final result.</typeparam>
+	/// <param name="sql">The SQL batch containing UPDATE and SELECT statements.</param>
+	/// <param name="parameters">An object containing the parameters to be passed to the SQL command.</param>
+	/// <param name="key">The key of the entity being updated, used in the NotFoundException if no row is returned.</param>
+	/// <param name="mapper">A function to transform the data row to the domain model.</param>
+	/// <param name="uniqueConstraintMessage">The error message to use if a unique constraint violation occurs.</param>
+	/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs.</param>
+	/// <returns>A <see cref="DbResult{T}"/> that can be chained with other database operations.</returns>
+	public DbResult<TModel> UpdateAndGetAsync<TData, TModel>(
+		string sql,
+		object? parameters,
+		object key,
+		Func<TData, TModel> mapper,
+		string uniqueConstraintMessage = "Record already exists",
+		string? foreignKeyMessage = "Referenced record does not exist")
+		=> new(this, connection.UpdateAndGetAsync(sql, parameters, key, mapper, uniqueConstraintMessage, foreignKeyMessage, transaction, cancellationToken));
+
+	/// <summary>
+	/// Executes an UPDATE command followed by a SELECT in a single batch and returns an <see cref="Optional{T}"/>
+	/// containing the selected row if present, allowing the caller to handle the empty case via a mapper.
+	/// </summary>
+	/// <typeparam name="TData">The type of the row returned by the SQL query.</typeparam>
+	/// <typeparam name="TModel">The type of the object in the final result.</typeparam>
+	/// <param name="sql">The SQL batch containing UPDATE and SELECT statements.</param>
+	/// <param name="parameters">An object containing the parameters to be passed to the SQL command.</param>
+	/// <param name="mapper">A function that receives an <see cref="Optional{T}"/> and returns the final result.</param>
+	/// <param name="uniqueConstraintMessage">The error message to use if a unique constraint violation occurs.</param>
+	/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs.</param>
+	/// <returns>A <see cref="DbResult{T}"/> that can be chained with other database operations.</returns>
+	public DbResult<TModel> UpdateAndGetOptionalAsync<TData, TModel>(
+		string sql,
+		object? parameters,
+		Func<Optional<TData>, TModel> mapper,
+		string uniqueConstraintMessage = "Record already exists",
+		string? foreignKeyMessage = "Referenced record does not exist")
+		=> new(this, connection.UpdateAndGetOptionalAsync(sql, parameters, mapper, uniqueConstraintMessage, foreignKeyMessage, transaction, cancellationToken));
+
+	#endregion
+
+	#region Delete and Get
+
+	/// <summary>
+	/// Executes a DELETE command and returns the deleted row using an OUTPUT clause or similar mechanism.
+	/// </summary>
+	/// <typeparam name="T">The type of the row to return.</typeparam>
+	/// <param name="sql">The SQL DELETE statement with OUTPUT or RETURNING clause.</param>
+	/// <param name="parameters">An object containing the parameters to be passed to the SQL command.</param>
+	/// <param name="key">The key of the entity being deleted, used in the NotFoundException if no row is returned.</param>
+	/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs.</param>
+	/// <returns>A <see cref="DbResult{T}"/> that can be chained with other database operations.</returns>
+	public DbResult<T> DeleteAndGetAsync<T>(
+		string sql,
+		object? parameters,
+		object key,
+		string foreignKeyMessage = "Cannot delete, record is in use")
+		=> new(this, connection.DeleteAndGetAsync<T>(sql, parameters, key, foreignKeyMessage, transaction, cancellationToken));
+
+	/// <summary>
+	/// Executes a DELETE command and returns the deleted row using an OUTPUT clause or similar mechanism,
+	/// applying a mapping function to transform the result.
+	/// </summary>
+	/// <typeparam name="TData">The type of the row returned by the SQL query.</typeparam>
+	/// <typeparam name="TModel">The type of the object in the final result.</typeparam>
+	/// <param name="sql">The SQL DELETE statement with OUTPUT or RETURNING clause.</param>
+	/// <param name="parameters">An object containing the parameters to be passed to the SQL command.</param>
+	/// <param name="key">The key of the entity being deleted, used in the NotFoundException if no row is returned.</param>
+	/// <param name="mapper">A function to transform the data row to the domain model.</param>
+	/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs.</param>
+	/// <returns>A <see cref="DbResult{T}"/> that can be chained with other database operations.</returns>
+	public DbResult<TModel> DeleteAndGetAsync<TData, TModel>(
+		string sql,
+		object? parameters,
+		object key,
+		Func<TData, TModel> mapper,
+		string foreignKeyMessage = "Cannot delete, record is in use")
+		=> new(this, connection.DeleteAndGetAsync(sql, parameters, key, mapper, foreignKeyMessage, transaction, cancellationToken));
+
+	/// <summary>
+	/// Executes a DELETE command and returns an <see cref="Optional{T}"/> containing the deleted row if present,
+	/// allowing the caller to handle the empty case via a mapper.
+	/// </summary>
+	/// <typeparam name="TData">The type of the row returned by the SQL query.</typeparam>
+	/// <typeparam name="TModel">The type of the object in the final result.</typeparam>
+	/// <param name="sql">The SQL DELETE statement with OUTPUT or RETURNING clause.</param>
+	/// <param name="parameters">An object containing the parameters to be passed to the SQL command.</param>
+	/// <param name="mapper">A function that receives an <see cref="Optional{T}"/> and returns the final result.</param>
+	/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs.</param>
+	/// <returns>A <see cref="DbResult{T}"/> that can be chained with other database operations.</returns>
+	public DbResult<TModel> DeleteAndGetOptionalAsync<TData, TModel>(
+		string sql,
+		object? parameters,
+		Func<Optional<TData>, TModel> mapper,
+		string foreignKeyMessage = "Cannot delete, record is in use")
+		=> new(this, connection.DeleteAndGetOptionalAsync(sql, parameters, mapper, foreignKeyMessage, transaction, cancellationToken));
+
+	#endregion
+
 	#region Delete-If
 
 	/// <summary>

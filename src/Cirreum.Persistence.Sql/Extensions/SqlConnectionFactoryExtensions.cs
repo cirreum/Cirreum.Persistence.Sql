@@ -1543,6 +1543,345 @@ public static class SqlConnectionFactoryExtensions {
 
 		#endregion
 
+		#region INSERT AND GET
+
+		/// <summary>
+		/// Executes an INSERT command followed by a SELECT in a single batch and returns the selected row.
+		/// </summary>
+		/// <remarks>
+		/// <para>
+		/// Use this method when you need to INSERT a record and immediately SELECT it back to get server-generated
+		/// values (auto-increment IDs, default values, computed columns, etc.) in a single database roundtrip.
+		/// Returns <see cref="InvalidOperationException"/> if no row is returned by the SELECT.
+		/// Unique constraint violations become <see cref="AlreadyExistsException"/> (HTTP 409).
+		/// Foreign key violations become <see cref="BadRequestException"/> (HTTP 400).
+		/// </para>
+		/// <para>
+		/// <strong>SQL Pattern:</strong>
+		/// </para>
+		/// <code>
+		/// INSERT INTO Orders (CustomerId, Amount) VALUES (@CustomerId, @Amount);
+		/// SELECT * FROM Orders WHERE Id = SCOPE_IDENTITY();
+		/// </code>
+		/// </remarks>
+		/// <typeparam name="T">The type of the row to return.</typeparam>
+		/// <param name="sql">The SQL batch containing INSERT and SELECT statements.</param>
+		/// <param name="parameters">An object containing the parameters to be passed to the SQL command, or <see langword="null"/> if no parameters are required.</param>
+		/// <param name="uniqueConstraintMessage">The error message to use if a unique constraint violation occurs.</param>
+		/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs, or <see langword="null"/> to let the exception propagate.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task that represents the asynchronous operation. The task result contains a <see cref="Result{T}"/>
+		/// with the selected row if successful, or a failure result with an appropriate exception.</returns>
+		public async Task<Result<T>> InsertAndGetAsync<T>(
+			string sql,
+			object? parameters = null,
+			string uniqueConstraintMessage = "Record already exists",
+			string? foreignKeyMessage = "Referenced record does not exist",
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.InsertAndGetAsync<T>(
+				sql,
+				parameters,
+				uniqueConstraintMessage,
+				foreignKeyMessage,
+				transaction: null,
+				cancellationToken: cancellationToken);
+		}
+
+		/// <summary>
+		/// Executes an INSERT command followed by a SELECT in a single batch and returns the selected row,
+		/// applying a mapping function to transform the result.
+		/// </summary>
+		/// <typeparam name="TData">The type of the row returned by the SQL query (data layer).</typeparam>
+		/// <typeparam name="TModel">The type of the object in the final result (domain layer).</typeparam>
+		/// <param name="sql">The SQL batch containing INSERT and SELECT statements.</param>
+		/// <param name="parameters">An object containing the parameters to be passed to the SQL command, or <see langword="null"/> if no parameters are required.</param>
+		/// <param name="mapper">A function to transform the data row to the domain model.</param>
+		/// <param name="uniqueConstraintMessage">The error message to use if a unique constraint violation occurs.</param>
+		/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs, or <see langword="null"/> to let the exception propagate.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task that represents the asynchronous operation. The task result contains a <see cref="Result{T}"/>
+		/// with the mapped row if successful, or a failure result with an appropriate exception.</returns>
+		public async Task<Result<TModel>> InsertAndGetAsync<TData, TModel>(
+			string sql,
+			object? parameters,
+			Func<TData, TModel> mapper,
+			string uniqueConstraintMessage = "Record already exists",
+			string? foreignKeyMessage = "Referenced record does not exist",
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.InsertAndGetAsync(
+				sql,
+				parameters,
+				mapper,
+				uniqueConstraintMessage,
+				foreignKeyMessage,
+				transaction: null,
+				cancellationToken: cancellationToken);
+		}
+
+		/// <summary>
+		/// Executes an INSERT command followed by a SELECT in a single batch and returns an <see cref="Optional{T}"/>
+		/// containing the selected row if present, allowing the caller to handle the empty case via a mapper.
+		/// </summary>
+		/// <typeparam name="TData">The type of the row returned by the SQL query (data layer).</typeparam>
+		/// <typeparam name="TModel">The type of the object in the final result (domain layer).</typeparam>
+		/// <param name="sql">The SQL batch containing INSERT and SELECT statements.</param>
+		/// <param name="parameters">An object containing the parameters to be passed to the SQL command, or <see langword="null"/> if no parameters are required.</param>
+		/// <param name="mapper">A function that receives an <see cref="Optional{T}"/> and returns the final result.</param>
+		/// <param name="uniqueConstraintMessage">The error message to use if a unique constraint violation occurs.</param>
+		/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs, or <see langword="null"/> to let the exception propagate.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task that represents the asynchronous operation. The task result contains a <see cref="Result{T}"/>
+		/// with the result from the mapper.</returns>
+		public async Task<Result<TModel>> InsertAndGetOptionalAsync<TData, TModel>(
+			string sql,
+			object? parameters,
+			Func<Optional<TData>, TModel> mapper,
+			string uniqueConstraintMessage = "Record already exists",
+			string? foreignKeyMessage = "Referenced record does not exist",
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.InsertAndGetOptionalAsync(
+				sql,
+				parameters,
+				mapper,
+				uniqueConstraintMessage,
+				foreignKeyMessage,
+				transaction: null,
+				cancellationToken: cancellationToken);
+		}
+
+		#endregion
+
+		#region UPDATE AND GET
+
+		/// <summary>
+		/// Executes an UPDATE command followed by a SELECT in a single batch and returns the selected row.
+		/// </summary>
+		/// <remarks>
+		/// <para>
+		/// Use this method when you need to UPDATE a record and immediately SELECT it back to get the updated
+		/// values (including any server-side modifications) in a single database roundtrip.
+		/// Returns <see cref="NotFoundException"/> (HTTP 404) if no row is returned by the SELECT.
+		/// Unique constraint violations become <see cref="AlreadyExistsException"/> (HTTP 409).
+		/// Foreign key violations become <see cref="BadRequestException"/> (HTTP 400).
+		/// </para>
+		/// <para>
+		/// <strong>SQL Pattern:</strong>
+		/// </para>
+		/// <code>
+		/// UPDATE Orders SET Amount = @Amount, UpdatedAt = GETUTCDATE() WHERE Id = @Id;
+		/// SELECT * FROM Orders WHERE Id = @Id;
+		/// </code>
+		/// </remarks>
+		/// <typeparam name="T">The type of the row to return.</typeparam>
+		/// <param name="sql">The SQL batch containing UPDATE and SELECT statements.</param>
+		/// <param name="parameters">An object containing the parameters to be passed to the SQL command, or <see langword="null"/> if no parameters are required.</param>
+		/// <param name="key">The key of the entity being updated, used in the <see cref="NotFoundException"/> if no row is returned.</param>
+		/// <param name="uniqueConstraintMessage">The error message to use if a unique constraint violation occurs.</param>
+		/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs, or <see langword="null"/> to let the exception propagate.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task that represents the asynchronous operation. The task result contains a <see cref="Result{T}"/>
+		/// with the selected row if successful, or a failure result with an appropriate exception.</returns>
+		public async Task<Result<T>> UpdateAndGetAsync<T>(
+			string sql,
+			object? parameters,
+			object key,
+			string uniqueConstraintMessage = "Record already exists",
+			string? foreignKeyMessage = "Referenced record does not exist",
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.UpdateAndGetAsync<T>(
+				sql,
+				parameters,
+				key,
+				uniqueConstraintMessage,
+				foreignKeyMessage,
+				transaction: null,
+				cancellationToken: cancellationToken);
+		}
+
+		/// <summary>
+		/// Executes an UPDATE command followed by a SELECT in a single batch and returns the selected row,
+		/// applying a mapping function to transform the result.
+		/// </summary>
+		/// <typeparam name="TData">The type of the row returned by the SQL query (data layer).</typeparam>
+		/// <typeparam name="TModel">The type of the object in the final result (domain layer).</typeparam>
+		/// <param name="sql">The SQL batch containing UPDATE and SELECT statements.</param>
+		/// <param name="parameters">An object containing the parameters to be passed to the SQL command, or <see langword="null"/> if no parameters are required.</param>
+		/// <param name="key">The key of the entity being updated, used in the <see cref="NotFoundException"/> if no row is returned.</param>
+		/// <param name="mapper">A function to transform the data row to the domain model.</param>
+		/// <param name="uniqueConstraintMessage">The error message to use if a unique constraint violation occurs.</param>
+		/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs, or <see langword="null"/> to let the exception propagate.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task that represents the asynchronous operation. The task result contains a <see cref="Result{T}"/>
+		/// with the mapped row if successful, or a failure result with an appropriate exception.</returns>
+		public async Task<Result<TModel>> UpdateAndGetAsync<TData, TModel>(
+			string sql,
+			object? parameters,
+			object key,
+			Func<TData, TModel> mapper,
+			string uniqueConstraintMessage = "Record already exists",
+			string? foreignKeyMessage = "Referenced record does not exist",
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.UpdateAndGetAsync(
+				sql,
+				parameters,
+				key,
+				mapper,
+				uniqueConstraintMessage,
+				foreignKeyMessage,
+				transaction: null,
+				cancellationToken: cancellationToken);
+		}
+
+		/// <summary>
+		/// Executes an UPDATE command followed by a SELECT in a single batch and returns an <see cref="Optional{T}"/>
+		/// containing the selected row if present, allowing the caller to handle the empty case via a mapper.
+		/// </summary>
+		/// <typeparam name="TData">The type of the row returned by the SQL query (data layer).</typeparam>
+		/// <typeparam name="TModel">The type of the object in the final result (domain layer).</typeparam>
+		/// <param name="sql">The SQL batch containing UPDATE and SELECT statements.</param>
+		/// <param name="parameters">An object containing the parameters to be passed to the SQL command, or <see langword="null"/> if no parameters are required.</param>
+		/// <param name="mapper">A function that receives an <see cref="Optional{T}"/> and returns the final result.</param>
+		/// <param name="uniqueConstraintMessage">The error message to use if a unique constraint violation occurs.</param>
+		/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs, or <see langword="null"/> to let the exception propagate.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task that represents the asynchronous operation. The task result contains a <see cref="Result{T}"/>
+		/// with the result from the mapper.</returns>
+		public async Task<Result<TModel>> UpdateAndGetOptionalAsync<TData, TModel>(
+			string sql,
+			object? parameters,
+			Func<Optional<TData>, TModel> mapper,
+			string uniqueConstraintMessage = "Record already exists",
+			string? foreignKeyMessage = "Referenced record does not exist",
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.UpdateAndGetOptionalAsync(
+				sql,
+				parameters,
+				mapper,
+				uniqueConstraintMessage,
+				foreignKeyMessage,
+				transaction: null,
+				cancellationToken: cancellationToken);
+		}
+
+		#endregion
+
+		#region DELETE AND GET
+
+		/// <summary>
+		/// Executes a DELETE command and returns the deleted row using an OUTPUT clause or similar mechanism.
+		/// </summary>
+		/// <remarks>
+		/// <para>
+		/// Use this method when you need to DELETE a record and retrieve what was deleted in a single database roundtrip.
+		/// Returns <see cref="NotFoundException"/> (HTTP 404) if no row is returned.
+		/// Foreign key violations become <see cref="ConflictException"/> (HTTP 409, record is still referenced).
+		/// </para>
+		/// <para>
+		/// <strong>SQL Pattern (SQL Server with OUTPUT):</strong>
+		/// </para>
+		/// <code>
+		/// DELETE FROM Orders OUTPUT DELETED.* WHERE Id = @Id;
+		/// </code>
+		/// <para>
+		/// <strong>SQL Pattern (PostgreSQL with RETURNING):</strong>
+		/// </para>
+		/// <code>
+		/// DELETE FROM Orders WHERE Id = @Id RETURNING *;
+		/// </code>
+		/// </remarks>
+		/// <typeparam name="T">The type of the row to return.</typeparam>
+		/// <param name="sql">The SQL DELETE statement with OUTPUT or RETURNING clause.</param>
+		/// <param name="parameters">An object containing the parameters to be passed to the SQL command, or <see langword="null"/> if no parameters are required.</param>
+		/// <param name="key">The key of the entity being deleted, used in the <see cref="NotFoundException"/> if no row is returned.</param>
+		/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task that represents the asynchronous operation. The task result contains a <see cref="Result{T}"/>
+		/// with the deleted row if successful, or a failure result with an appropriate exception.</returns>
+		public async Task<Result<T>> DeleteAndGetAsync<T>(
+			string sql,
+			object? parameters,
+			object key,
+			string foreignKeyMessage = "Cannot delete, record is in use",
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.DeleteAndGetAsync<T>(
+				sql,
+				parameters,
+				key,
+				foreignKeyMessage,
+				transaction: null,
+				cancellationToken: cancellationToken);
+		}
+
+		/// <summary>
+		/// Executes a DELETE command and returns the deleted row using an OUTPUT clause or similar mechanism,
+		/// applying a mapping function to transform the result.
+		/// </summary>
+		/// <typeparam name="TData">The type of the row returned by the SQL query (data layer).</typeparam>
+		/// <typeparam name="TModel">The type of the object in the final result (domain layer).</typeparam>
+		/// <param name="sql">The SQL DELETE statement with OUTPUT or RETURNING clause.</param>
+		/// <param name="parameters">An object containing the parameters to be passed to the SQL command, or <see langword="null"/> if no parameters are required.</param>
+		/// <param name="key">The key of the entity being deleted, used in the <see cref="NotFoundException"/> if no row is returned.</param>
+		/// <param name="mapper">A function to transform the data row to the domain model.</param>
+		/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task that represents the asynchronous operation. The task result contains a <see cref="Result{T}"/>
+		/// with the mapped row if successful, or a failure result with an appropriate exception.</returns>
+		public async Task<Result<TModel>> DeleteAndGetAsync<TData, TModel>(
+			string sql,
+			object? parameters,
+			object key,
+			Func<TData, TModel> mapper,
+			string foreignKeyMessage = "Cannot delete, record is in use",
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.DeleteAndGetAsync(
+				sql,
+				parameters,
+				key,
+				mapper,
+				foreignKeyMessage,
+				transaction: null,
+				cancellationToken: cancellationToken);
+		}
+
+		/// <summary>
+		/// Executes a DELETE command and returns an <see cref="Optional{T}"/> containing the deleted row if present,
+		/// allowing the caller to handle the empty case via a mapper.
+		/// </summary>
+		/// <typeparam name="TData">The type of the row returned by the SQL query (data layer).</typeparam>
+		/// <typeparam name="TModel">The type of the object in the final result (domain layer).</typeparam>
+		/// <param name="sql">The SQL DELETE statement with OUTPUT or RETURNING clause.</param>
+		/// <param name="parameters">An object containing the parameters to be passed to the SQL command, or <see langword="null"/> if no parameters are required.</param>
+		/// <param name="mapper">A function that receives an <see cref="Optional{T}"/> and returns the final result.</param>
+		/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task that represents the asynchronous operation. The task result contains a <see cref="Result{T}"/>
+		/// with the result from the mapper.</returns>
+		public async Task<Result<TModel>> DeleteAndGetOptionalAsync<TData, TModel>(
+			string sql,
+			object? parameters,
+			Func<Optional<TData>, TModel> mapper,
+			string foreignKeyMessage = "Cannot delete, record is in use",
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.DeleteAndGetOptionalAsync(
+				sql,
+				parameters,
+				mapper,
+				foreignKeyMessage,
+				transaction: null,
+				cancellationToken: cancellationToken);
+		}
+
+		#endregion
+
 		#region INSERT WITH COUNT
 
 		/// <summary>

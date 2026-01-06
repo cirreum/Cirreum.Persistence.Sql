@@ -2988,6 +2988,580 @@ public sealed class SqliteIntegrationTests {
 
 	#endregion
 
+	#region InsertAndGet
+
+	[TestMethod]
+	public async Task InsertAndGetAsync_WhenSuccessful_ReturnsInsertedRow() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+		var userId = Guid.NewGuid().ToString();
+
+		// Act
+		var result = await conn.InsertAndGetAsync<UserDto>(
+			"""
+			INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email);
+			SELECT Id, Name, Email FROM Users WHERE Id = @Id;
+			""",
+			new { Id = userId, Name = "John", Email = "john@test.com" },
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual(userId, result.Value.Id);
+		Assert.AreEqual("John", result.Value.Name);
+		Assert.AreEqual("john@test.com", result.Value.Email);
+	}
+
+	[TestMethod]
+	public async Task InsertAndGetAsync_WithMapper_TransformsResult() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+		var userId = Guid.NewGuid().ToString();
+
+		// Act
+		var result = await conn.InsertAndGetAsync<UserDto, User>(
+			"""
+			INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email);
+			SELECT Id, Name, Email FROM Users WHERE Id = @Id;
+			""",
+			new { Id = userId, Name = "Jane", Email = "jane@test.com" },
+			dto => new User(dto.Id, dto.Name, dto.Email),
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual("Jane", result.Value.Name);
+	}
+
+	[TestMethod]
+	public async Task InsertAndGetAsync_WhenUniqueConstraintViolation_ReturnsAlreadyExists() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+		var userId = Guid.NewGuid().ToString();
+		rawConn.Execute("INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId, Name = "John", Email = "john@test.com" });
+
+		// Act - insert with same email (unique constraint)
+		var result = await conn.InsertAndGetAsync<UserDto>(
+			"""
+			INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email);
+			SELECT Id, Name, Email FROM Users WHERE Id = @Id;
+			""",
+			new { Id = Guid.NewGuid().ToString(), Name = "Jane", Email = "john@test.com" },
+			uniqueConstraintMessage: "User with this email already exists",
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsFailure);
+		Assert.IsInstanceOfType<AlreadyExistsException>(result.Error);
+		Assert.AreEqual("User with this email already exists", result.Error.Message);
+	}
+
+	[TestMethod]
+	public async Task InsertAndGetOptionalAsync_WhenConditionalInsertSucceeds_ReturnsRow() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+		var userId = Guid.NewGuid().ToString();
+
+		// Act - conditional insert that succeeds (no existing row)
+		var result = await conn.InsertAndGetOptionalAsync<UserDto, string>(
+			"""
+			INSERT INTO Users (Id, Name, Email)
+			SELECT @Id, @Name, @Email
+			WHERE NOT EXISTS (SELECT 1 FROM Users WHERE Email = @Email);
+			SELECT Id, Name, Email FROM Users WHERE Id = @Id;
+			""",
+			new { Id = userId, Name = "John", Email = "john@test.com" },
+			opt => opt.HasValue ? $"Created: {opt.Value.Name}" : "Already exists",
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual("Created: John", result.Value);
+	}
+
+	[TestMethod]
+	public async Task InsertAndGetOptionalAsync_WhenConditionalInsertSkipped_ReturnsNone() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+		var existingUserId = Guid.NewGuid().ToString();
+		rawConn.Execute("INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = existingUserId, Name = "John", Email = "john@test.com" });
+
+		var newUserId = Guid.NewGuid().ToString();
+
+		// Act - conditional insert that is skipped (row exists with same email)
+		var result = await conn.InsertAndGetOptionalAsync<UserDto, string>(
+			"""
+			INSERT INTO Users (Id, Name, Email)
+			SELECT @Id, @Name, @Email
+			WHERE NOT EXISTS (SELECT 1 FROM Users WHERE Email = @Email);
+			SELECT Id, Name, Email FROM Users WHERE Id = @Id;
+			""",
+			new { Id = newUserId, Name = "Jane", Email = "john@test.com" },
+			opt => opt.HasValue ? $"Created: {opt.Value.Name}" : "Already exists",
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual("Already exists", result.Value);
+	}
+
+	#endregion
+
+	#region UpdateAndGet
+
+	[TestMethod]
+	public async Task UpdateAndGetAsync_WhenSuccessful_ReturnsUpdatedRow() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+		var userId = Guid.NewGuid().ToString();
+		rawConn.Execute("INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId, Name = "John", Email = "john@test.com" });
+
+		// Act
+		var result = await conn.UpdateAndGetAsync<UserDto>(
+			"""
+			UPDATE Users SET Name = @Name WHERE Id = @Id;
+			SELECT Id, Name, Email FROM Users WHERE Id = @Id;
+			""",
+			new { Id = userId, Name = "Johnny" },
+			key: userId,
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual(userId, result.Value.Id);
+		Assert.AreEqual("Johnny", result.Value.Name);
+		Assert.AreEqual("john@test.com", result.Value.Email);
+	}
+
+	[TestMethod]
+	public async Task UpdateAndGetAsync_WhenRecordNotFound_ReturnsNotFound() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+		var nonExistentId = Guid.NewGuid().ToString();
+
+		// Act
+		var result = await conn.UpdateAndGetAsync<UserDto>(
+			"""
+			UPDATE Users SET Name = @Name WHERE Id = @Id;
+			SELECT Id, Name, Email FROM Users WHERE Id = @Id;
+			""",
+			new { Id = nonExistentId, Name = "Johnny" },
+			key: nonExistentId,
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsFailure);
+		Assert.IsInstanceOfType<NotFoundException>(result.Error);
+	}
+
+	[TestMethod]
+	public async Task UpdateAndGetAsync_WithMapper_TransformsResult() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+		var userId = Guid.NewGuid().ToString();
+		rawConn.Execute("INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId, Name = "John", Email = "john@test.com" });
+
+		// Act
+		var result = await conn.UpdateAndGetAsync<UserDto, UserLight>(
+			"""
+			UPDATE Users SET Name = @Name WHERE Id = @Id;
+			SELECT Id, Name, Email FROM Users WHERE Id = @Id;
+			""",
+			new { Id = userId, Name = "Johnny" },
+			key: userId,
+			dto => new UserLight(dto.Id, dto.Name),
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual("Johnny", result.Value.Name);
+	}
+
+	[TestMethod]
+	public async Task UpdateAndGetAsync_WhenUniqueConstraintViolation_ReturnsAlreadyExists() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+		var userId1 = Guid.NewGuid().ToString();
+		var userId2 = Guid.NewGuid().ToString();
+		rawConn.Execute("INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId1, Name = "John", Email = "john@test.com" });
+		rawConn.Execute("INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId2, Name = "Jane", Email = "jane@test.com" });
+
+		// Act - try to update user2's email to user1's email (unique constraint)
+		var result = await conn.UpdateAndGetAsync<UserDto>(
+			"""
+			UPDATE Users SET Email = @Email WHERE Id = @Id;
+			SELECT Id, Name, Email FROM Users WHERE Id = @Id;
+			""",
+			new { Id = userId2, Email = "john@test.com" },
+			key: userId2,
+			uniqueConstraintMessage: "Email already in use",
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsFailure);
+		Assert.IsInstanceOfType<AlreadyExistsException>(result.Error);
+		Assert.AreEqual("Email already in use", result.Error.Message);
+	}
+
+	[TestMethod]
+	public async Task UpdateAndGetOptionalAsync_WhenConditionalUpdateSucceeds_ReturnsRow() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+		var userId = Guid.NewGuid().ToString();
+		rawConn.Execute("INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId, Name = "John", Email = "john@test.com" });
+
+		// Act
+		var result = await conn.UpdateAndGetOptionalAsync<UserDto, string>(
+			"""
+			UPDATE Users SET Name = @Name WHERE Id = @Id AND Name != @Name;
+			SELECT Id, Name, Email FROM Users WHERE Id = @Id;
+			""",
+			new { Id = userId, Name = "Johnny" },
+			opt => opt.HasValue ? $"Updated: {opt.Value.Name}" : "Not updated",
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual("Updated: Johnny", result.Value);
+	}
+
+	#endregion
+
+	#region DeleteAndGet
+
+	[TestMethod]
+	public async Task DeleteAndGetAsync_WhenSuccessful_ReturnsDeletedRow() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+		var userId = Guid.NewGuid().ToString();
+		rawConn.Execute("INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId, Name = "John", Email = "john@test.com" });
+
+		// Act - SQLite doesn't support OUTPUT, so we SELECT first then DELETE
+		var result = await conn.DeleteAndGetAsync<UserDto>(
+			"""
+			SELECT Id, Name, Email FROM Users WHERE Id = @Id;
+			DELETE FROM Users WHERE Id = @Id;
+			""",
+			new { Id = userId },
+			key: userId,
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual(userId, result.Value.Id);
+		Assert.AreEqual("John", result.Value.Name);
+
+		// Verify deleted
+		var count = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Users WHERE Id = @Id", new { Id = userId });
+		Assert.AreEqual(0L, count);
+	}
+
+	[TestMethod]
+	public async Task DeleteAndGetAsync_WhenRecordNotFound_ReturnsNotFound() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+		var nonExistentId = Guid.NewGuid().ToString();
+
+		// Act
+		var result = await conn.DeleteAndGetAsync<UserDto>(
+			"""
+			SELECT Id, Name, Email FROM Users WHERE Id = @Id;
+			DELETE FROM Users WHERE Id = @Id;
+			""",
+			new { Id = nonExistentId },
+			key: nonExistentId,
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsFailure);
+		Assert.IsInstanceOfType<NotFoundException>(result.Error);
+	}
+
+	[TestMethod]
+	public async Task DeleteAndGetAsync_WithMapper_TransformsResult() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+		var userId = Guid.NewGuid().ToString();
+		rawConn.Execute("INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId, Name = "John", Email = "john@test.com" });
+
+		// Act
+		var result = await conn.DeleteAndGetAsync<UserDto, string>(
+			"""
+			SELECT Id, Name, Email FROM Users WHERE Id = @Id;
+			DELETE FROM Users WHERE Id = @Id;
+			""",
+			new { Id = userId },
+			key: userId,
+			dto => $"Deleted user: {dto.Name}",
+			cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual("Deleted user: John", result.Value);
+	}
+
+	#endregion
+
+	#region InsertAndGet/UpdateAndGet/DeleteAndGet Chaining
+
+	[TestMethod]
+	public async Task FluentChaining_GetThenInsertAndGet_ReturnsInsertedRow() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+		var userId = Guid.NewGuid().ToString();
+		rawConn.Execute("INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId, Name = "John", Email = "john@test.com" });
+
+		var orderId = Guid.NewGuid().ToString();
+
+		// Act
+		var result = await conn.ExecuteTransactionAsync<OrderDto>(db =>
+			db.GetAsync<UserDto>(
+				"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
+				new { Id = userId },
+				userId)
+			.ThenInsertAndGetAsync<OrderDto>(
+				"""
+				INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount);
+				SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id;
+				""",
+				user => new { Id = orderId, UserId = user.Id, Amount = 99.99 })
+			, this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual(orderId, result.Value.Id);
+		Assert.AreEqual(userId, result.Value.UserId);
+		Assert.AreEqual(99.99, result.Value.Amount);
+	}
+
+	[TestMethod]
+	public async Task FluentChaining_InsertAndGetThenUpdateAndGet_ChainsOperations() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+		var userId = Guid.NewGuid().ToString();
+		rawConn.Execute("INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId, Name = "John", Email = "john@test.com" });
+
+		var orderId = Guid.NewGuid().ToString();
+
+		// Act - insert an order, then update its amount
+		var result = await conn.ExecuteTransactionAsync<OrderDto>(db =>
+			db.InsertAndGetAsync<OrderDto>(
+				"""
+				INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount);
+				SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id;
+				""",
+				new { Id = orderId, UserId = userId, Amount = 50.0 })
+			.ThenUpdateAndGetAsync<OrderDto>(
+				"""
+				UPDATE Orders SET Amount = @Amount WHERE Id = @Id;
+				SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id;
+				""",
+				order => new { Id = order.Id, Amount = order.Amount * 2 },
+				order => order.Id)
+			, this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual(orderId, result.Value.Id);
+		Assert.AreEqual(100.0, result.Value.Amount); // 50 * 2
+	}
+
+	[TestMethod]
+	public async Task FluentChaining_GetThenInsertAndGetThenDelete_FullChain() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+		var userId = Guid.NewGuid().ToString();
+		rawConn.Execute("INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId, Name = "John", Email = "john@test.com" });
+
+		var orderId = Guid.NewGuid().ToString();
+
+		// Act - Get user, insert order, then delete the order
+		var result = await conn.ExecuteTransactionAsync<OrderDto>(db =>
+			db.GetAsync<UserDto>(
+				"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
+				new { Id = userId },
+				userId)
+			.ThenInsertAndGetAsync<OrderDto>(
+				"""
+				INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount);
+				SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id;
+				""",
+				user => new { Id = orderId, UserId = user.Id, Amount = 75.0 })
+			.ThenDeleteAndGetAsync<OrderDto>(
+				"""
+				SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id;
+				DELETE FROM Orders WHERE Id = @Id;
+				""",
+				order => new { Id = order.Id },
+				order => order.Id)
+			, this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual(orderId, result.Value.Id);
+		Assert.AreEqual(75.0, result.Value.Amount);
+
+		// Verify deleted
+		var count = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { Id = orderId });
+		Assert.AreEqual(0L, count);
+	}
+
+	[TestMethod]
+	public async Task FluentChaining_WhenFirstStepFails_SubsequentStepsSkipped() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+		var nonExistentUserId = Guid.NewGuid().ToString();
+		var orderId = Guid.NewGuid().ToString();
+
+		// Act - Get non-existent user, then try to insert order (should be skipped)
+		var result = await conn.ExecuteTransactionAsync<OrderDto>(db =>
+			db.GetAsync<UserDto>(
+				"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
+				new { Id = nonExistentUserId },
+				nonExistentUserId)
+			.ThenInsertAndGetAsync<OrderDto>(
+				"""
+				INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount);
+				SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id;
+				""",
+				user => new { Id = orderId, UserId = user.Id, Amount = 100.0 })
+			, this.TestContext.CancellationToken);
+
+		// Assert - Should fail with NotFoundException from the first step
+		Assert.IsTrue(result.IsFailure);
+		Assert.IsInstanceOfType<NotFoundException>(result.Error);
+
+		// Verify order was NOT inserted (chain short-circuited)
+		var count = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { Id = orderId });
+		Assert.AreEqual(0L, count);
+	}
+
+	[TestMethod]
+	public async Task FluentChaining_WhenMiddleStepFails_TransactionRolledBack() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+		var userId = Guid.NewGuid().ToString();
+		rawConn.Execute("INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId, Name = "John", Email = "john@test.com" });
+
+		var orderId = Guid.NewGuid().ToString();
+		var nonExistentOrderId = Guid.NewGuid().ToString();
+
+		// Act - Insert order (succeeds), then update non-existent order (fails)
+		var result = await conn.ExecuteTransactionAsync<OrderDto>(db =>
+			db.InsertAndGetAsync<OrderDto>(
+				"""
+				INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount);
+				SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id;
+				""",
+				new { Id = orderId, UserId = userId, Amount = 50.0 })
+			.ThenUpdateAndGetAsync<OrderDto>(
+				"""
+				UPDATE Orders SET Amount = @Amount WHERE Id = @Id;
+				SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id;
+				""",
+				_ => new { Id = nonExistentOrderId, Amount = 999.0 },
+				_ => nonExistentOrderId)
+			, this.TestContext.CancellationToken);
+
+		// Assert - Should fail with NotFoundException from the second step
+		Assert.IsTrue(result.IsFailure);
+		Assert.IsInstanceOfType<NotFoundException>(result.Error);
+
+		// Verify order was rolled back (transaction failed)
+		var count = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { Id = orderId });
+		Assert.AreEqual(0L, count);
+	}
+
+	[TestMethod]
+	public async Task FluentChaining_ThenInsertAndGetOptional_HandlesEmptyCase() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+		var userId = Guid.NewGuid().ToString();
+		rawConn.Execute("INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId, Name = "John", Email = "john@test.com" });
+
+		// Insert an existing order
+		var existingOrderId = Guid.NewGuid().ToString();
+		rawConn.Execute("INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
+			new { Id = existingOrderId, UserId = userId, Amount = 100.0 });
+
+		var newOrderId = Guid.NewGuid().ToString();
+
+		// Act - conditional insert that is skipped
+		var result = await conn.ExecuteTransactionAsync<string>(db =>
+			db.GetAsync<UserDto>(
+				"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
+				new { Id = userId },
+				userId)
+			.ThenInsertAndGetOptionalAsync<OrderDto, string>(
+				"""
+				INSERT INTO Orders (Id, UserId, Amount)
+				SELECT @Id, @UserId, @Amount
+				WHERE NOT EXISTS (SELECT 1 FROM Orders WHERE UserId = @UserId);
+				SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id;
+				""",
+				user => new { Id = newOrderId, UserId = user.Id, Amount = 200.0 },
+				opt => opt.HasValue ? $"Created order: {opt.Value.Id}" : "User already has an order")
+			, this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual("User already has an order", result.Value);
+	}
+
+	#endregion
+
 	#region Test DTOs
 
 	private record UserDto(string Id, string Name, string Email);

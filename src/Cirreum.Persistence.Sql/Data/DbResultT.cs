@@ -732,6 +732,99 @@ public readonly struct DbResult<T>(DbContext context, Task<Result<T>> resultTask
 
 	#endregion
 
+	#region Then Insert and Get
+
+	/// <summary>
+	/// Chains an INSERT + SELECT operation that returns the selected row.
+	/// </summary>
+	/// <typeparam name="TNext">The type of the row returned by the SELECT.</typeparam>
+	/// <param name="sql">The SQL batch containing INSERT and SELECT statements.</param>
+	/// <param name="parametersFactory">Factory to create parameters from the current value.</param>
+	/// <param name="uniqueConstraintMessage">Error message for unique constraint violations.</param>
+	/// <param name="foreignKeyMessage">Error message for foreign key violations.</param>
+	public DbResult<TNext> ThenInsertAndGetAsync<TNext>(
+		string sql,
+		Func<T, object?> parametersFactory,
+		string uniqueConstraintMessage = "Record already exists",
+		string? foreignKeyMessage = "Referenced record does not exist")
+		=> new(context, this.ThenInsertAndGetAsyncCore<TNext>(sql, parametersFactory, uniqueConstraintMessage, foreignKeyMessage));
+
+	/// <summary>
+	/// Chains an INSERT + SELECT operation that returns the selected row, applying a mapping function.
+	/// </summary>
+	/// <typeparam name="TData">The type of the row returned by the SQL query.</typeparam>
+	/// <typeparam name="TModel">The type of the object in the final result.</typeparam>
+	/// <param name="sql">The SQL batch containing INSERT and SELECT statements.</param>
+	/// <param name="parametersFactory">Factory to create parameters from the current value.</param>
+	/// <param name="mapper">A function to transform the data row to the domain model.</param>
+	/// <param name="uniqueConstraintMessage">Error message for unique constraint violations.</param>
+	/// <param name="foreignKeyMessage">Error message for foreign key violations.</param>
+	public DbResult<TModel> ThenInsertAndGetAsync<TData, TModel>(
+		string sql,
+		Func<T, object?> parametersFactory,
+		Func<TData, TModel> mapper,
+		string uniqueConstraintMessage = "Record already exists",
+		string? foreignKeyMessage = "Referenced record does not exist")
+		=> new(context, this.ThenInsertAndGetAsyncCore(sql, parametersFactory, mapper, uniqueConstraintMessage, foreignKeyMessage));
+
+	/// <summary>
+	/// Chains an INSERT + SELECT operation that returns an Optional, allowing the caller to handle the empty case.
+	/// </summary>
+	/// <typeparam name="TData">The type of the row returned by the SQL query.</typeparam>
+	/// <typeparam name="TModel">The type of the object in the final result.</typeparam>
+	/// <param name="sql">The SQL batch containing INSERT and SELECT statements.</param>
+	/// <param name="parametersFactory">Factory to create parameters from the current value.</param>
+	/// <param name="mapper">A function that receives an Optional and returns the final result.</param>
+	/// <param name="uniqueConstraintMessage">Error message for unique constraint violations.</param>
+	/// <param name="foreignKeyMessage">Error message for foreign key violations.</param>
+	public DbResult<TModel> ThenInsertAndGetOptionalAsync<TData, TModel>(
+		string sql,
+		Func<T, object?> parametersFactory,
+		Func<Optional<TData>, TModel> mapper,
+		string uniqueConstraintMessage = "Record already exists",
+		string? foreignKeyMessage = "Referenced record does not exist")
+		=> new(context, this.ThenInsertAndGetOptionalAsyncCore(sql, parametersFactory, mapper, uniqueConstraintMessage, foreignKeyMessage));
+
+	private async Task<Result<TNext>> ThenInsertAndGetAsyncCore<TNext>(
+		string sql,
+		Func<T, object?> parametersFactory,
+		string uniqueConstraintMessage,
+		string? foreignKeyMessage) {
+		var result = await resultTask.ConfigureAwait(false);
+		if (result.IsFailure) {
+			return result.Error;
+		}
+		return await context.InsertAndGetAsync<TNext>(sql, parametersFactory(result.Value), uniqueConstraintMessage, foreignKeyMessage).Result.ConfigureAwait(false);
+	}
+
+	private async Task<Result<TModel>> ThenInsertAndGetAsyncCore<TData, TModel>(
+		string sql,
+		Func<T, object?> parametersFactory,
+		Func<TData, TModel> mapper,
+		string uniqueConstraintMessage,
+		string? foreignKeyMessage) {
+		var result = await resultTask.ConfigureAwait(false);
+		if (result.IsFailure) {
+			return result.Error;
+		}
+		return await context.InsertAndGetAsync(sql, parametersFactory(result.Value), mapper, uniqueConstraintMessage, foreignKeyMessage).Result.ConfigureAwait(false);
+	}
+
+	private async Task<Result<TModel>> ThenInsertAndGetOptionalAsyncCore<TData, TModel>(
+		string sql,
+		Func<T, object?> parametersFactory,
+		Func<Optional<TData>, TModel> mapper,
+		string uniqueConstraintMessage,
+		string? foreignKeyMessage) {
+		var result = await resultTask.ConfigureAwait(false);
+		if (result.IsFailure) {
+			return result.Error;
+		}
+		return await context.InsertAndGetOptionalAsync(sql, parametersFactory(result.Value), mapper, uniqueConstraintMessage, foreignKeyMessage).Result.ConfigureAwait(false);
+	}
+
+	#endregion
+
 	//========================= THEN UPDATE =========================
 	//===============================================================
 
@@ -1047,6 +1140,105 @@ public readonly struct DbResult<T>(DbContext context, Task<Result<T>> resultTask
 
 	#endregion
 
+	#region Then Update and Get
+
+	/// <summary>
+	/// Chains an UPDATE + SELECT operation that returns the selected row.
+	/// </summary>
+	/// <typeparam name="TNext">The type of the row returned by the SELECT.</typeparam>
+	/// <param name="sql">The SQL batch containing UPDATE and SELECT statements.</param>
+	/// <param name="parametersFactory">Factory to create parameters from the current value.</param>
+	/// <param name="keyFactory">Factory to create the key for NotFoundException from the current value.</param>
+	/// <param name="uniqueConstraintMessage">Error message for unique constraint violations.</param>
+	/// <param name="foreignKeyMessage">Error message for foreign key violations.</param>
+	public DbResult<TNext> ThenUpdateAndGetAsync<TNext>(
+		string sql,
+		Func<T, object?> parametersFactory,
+		Func<T, object> keyFactory,
+		string uniqueConstraintMessage = "Record already exists",
+		string? foreignKeyMessage = "Referenced record does not exist")
+		=> new(context, this.ThenUpdateAndGetAsyncCore<TNext>(sql, parametersFactory, keyFactory, uniqueConstraintMessage, foreignKeyMessage));
+
+	/// <summary>
+	/// Chains an UPDATE + SELECT operation that returns the selected row, applying a mapping function.
+	/// </summary>
+	/// <typeparam name="TData">The type of the row returned by the SQL query.</typeparam>
+	/// <typeparam name="TModel">The type of the object in the final result.</typeparam>
+	/// <param name="sql">The SQL batch containing UPDATE and SELECT statements.</param>
+	/// <param name="parametersFactory">Factory to create parameters from the current value.</param>
+	/// <param name="keyFactory">Factory to create the key for NotFoundException from the current value.</param>
+	/// <param name="mapper">A function to transform the data row to the domain model.</param>
+	/// <param name="uniqueConstraintMessage">Error message for unique constraint violations.</param>
+	/// <param name="foreignKeyMessage">Error message for foreign key violations.</param>
+	public DbResult<TModel> ThenUpdateAndGetAsync<TData, TModel>(
+		string sql,
+		Func<T, object?> parametersFactory,
+		Func<T, object> keyFactory,
+		Func<TData, TModel> mapper,
+		string uniqueConstraintMessage = "Record already exists",
+		string? foreignKeyMessage = "Referenced record does not exist")
+		=> new(context, this.ThenUpdateAndGetAsyncCore(sql, parametersFactory, keyFactory, mapper, uniqueConstraintMessage, foreignKeyMessage));
+
+	/// <summary>
+	/// Chains an UPDATE + SELECT operation that returns an Optional, allowing the caller to handle the empty case.
+	/// </summary>
+	/// <typeparam name="TData">The type of the row returned by the SQL query.</typeparam>
+	/// <typeparam name="TModel">The type of the object in the final result.</typeparam>
+	/// <param name="sql">The SQL batch containing UPDATE and SELECT statements.</param>
+	/// <param name="parametersFactory">Factory to create parameters from the current value.</param>
+	/// <param name="mapper">A function that receives an Optional and returns the final result.</param>
+	/// <param name="uniqueConstraintMessage">Error message for unique constraint violations.</param>
+	/// <param name="foreignKeyMessage">Error message for foreign key violations.</param>
+	public DbResult<TModel> ThenUpdateAndGetOptionalAsync<TData, TModel>(
+		string sql,
+		Func<T, object?> parametersFactory,
+		Func<Optional<TData>, TModel> mapper,
+		string uniqueConstraintMessage = "Record already exists",
+		string? foreignKeyMessage = "Referenced record does not exist")
+		=> new(context, this.ThenUpdateAndGetOptionalAsyncCore(sql, parametersFactory, mapper, uniqueConstraintMessage, foreignKeyMessage));
+
+	private async Task<Result<TNext>> ThenUpdateAndGetAsyncCore<TNext>(
+		string sql,
+		Func<T, object?> parametersFactory,
+		Func<T, object> keyFactory,
+		string uniqueConstraintMessage,
+		string? foreignKeyMessage) {
+		var result = await resultTask.ConfigureAwait(false);
+		if (result.IsFailure) {
+			return result.Error;
+		}
+		return await context.UpdateAndGetAsync<TNext>(sql, parametersFactory(result.Value), keyFactory(result.Value), uniqueConstraintMessage, foreignKeyMessage).Result.ConfigureAwait(false);
+	}
+
+	private async Task<Result<TModel>> ThenUpdateAndGetAsyncCore<TData, TModel>(
+		string sql,
+		Func<T, object?> parametersFactory,
+		Func<T, object> keyFactory,
+		Func<TData, TModel> mapper,
+		string uniqueConstraintMessage,
+		string? foreignKeyMessage) {
+		var result = await resultTask.ConfigureAwait(false);
+		if (result.IsFailure) {
+			return result.Error;
+		}
+		return await context.UpdateAndGetAsync(sql, parametersFactory(result.Value), keyFactory(result.Value), mapper, uniqueConstraintMessage, foreignKeyMessage).Result.ConfigureAwait(false);
+	}
+
+	private async Task<Result<TModel>> ThenUpdateAndGetOptionalAsyncCore<TData, TModel>(
+		string sql,
+		Func<T, object?> parametersFactory,
+		Func<Optional<TData>, TModel> mapper,
+		string uniqueConstraintMessage,
+		string? foreignKeyMessage) {
+		var result = await resultTask.ConfigureAwait(false);
+		if (result.IsFailure) {
+			return result.Error;
+		}
+		return await context.UpdateAndGetOptionalAsync(sql, parametersFactory(result.Value), mapper, uniqueConstraintMessage, foreignKeyMessage).Result.ConfigureAwait(false);
+	}
+
+	#endregion
+
 
 	//========================= THEN DELETE =========================
 	//===============================================================
@@ -1334,6 +1526,96 @@ public readonly struct DbResult<T>(DbContext context, Task<Result<T>> resultTask
 			return deleteResult.Error;
 		}
 		return resultSelector(result.Value);
+	}
+
+	#endregion
+
+	#region Then Delete and Get
+
+	/// <summary>
+	/// Chains a DELETE + OUTPUT operation that returns the deleted row.
+	/// </summary>
+	/// <typeparam name="TNext">The type of the row returned by the OUTPUT clause.</typeparam>
+	/// <param name="sql">The SQL DELETE statement with OUTPUT or RETURNING clause.</param>
+	/// <param name="parametersFactory">Factory to create parameters from the current value.</param>
+	/// <param name="keyFactory">Factory to create the key for NotFoundException from the current value.</param>
+	/// <param name="foreignKeyMessage">Error message for foreign key violations.</param>
+	public DbResult<TNext> ThenDeleteAndGetAsync<TNext>(
+		string sql,
+		Func<T, object?> parametersFactory,
+		Func<T, object> keyFactory,
+		string foreignKeyMessage = "Cannot delete, record is in use")
+		=> new(context, this.ThenDeleteAndGetAsyncCore<TNext>(sql, parametersFactory, keyFactory, foreignKeyMessage));
+
+	/// <summary>
+	/// Chains a DELETE + OUTPUT operation that returns the deleted row, applying a mapping function.
+	/// </summary>
+	/// <typeparam name="TData">The type of the row returned by the SQL query.</typeparam>
+	/// <typeparam name="TModel">The type of the object in the final result.</typeparam>
+	/// <param name="sql">The SQL DELETE statement with OUTPUT or RETURNING clause.</param>
+	/// <param name="parametersFactory">Factory to create parameters from the current value.</param>
+	/// <param name="keyFactory">Factory to create the key for NotFoundException from the current value.</param>
+	/// <param name="mapper">A function to transform the data row to the domain model.</param>
+	/// <param name="foreignKeyMessage">Error message for foreign key violations.</param>
+	public DbResult<TModel> ThenDeleteAndGetAsync<TData, TModel>(
+		string sql,
+		Func<T, object?> parametersFactory,
+		Func<T, object> keyFactory,
+		Func<TData, TModel> mapper,
+		string foreignKeyMessage = "Cannot delete, record is in use")
+		=> new(context, this.ThenDeleteAndGetAsyncCore(sql, parametersFactory, keyFactory, mapper, foreignKeyMessage));
+
+	/// <summary>
+	/// Chains a DELETE + OUTPUT operation that returns an Optional, allowing the caller to handle the empty case.
+	/// </summary>
+	/// <typeparam name="TData">The type of the row returned by the SQL query.</typeparam>
+	/// <typeparam name="TModel">The type of the object in the final result.</typeparam>
+	/// <param name="sql">The SQL DELETE statement with OUTPUT or RETURNING clause.</param>
+	/// <param name="parametersFactory">Factory to create parameters from the current value.</param>
+	/// <param name="mapper">A function that receives an Optional and returns the final result.</param>
+	/// <param name="foreignKeyMessage">Error message for foreign key violations.</param>
+	public DbResult<TModel> ThenDeleteAndGetOptionalAsync<TData, TModel>(
+		string sql,
+		Func<T, object?> parametersFactory,
+		Func<Optional<TData>, TModel> mapper,
+		string foreignKeyMessage = "Cannot delete, record is in use")
+		=> new(context, this.ThenDeleteAndGetOptionalAsyncCore(sql, parametersFactory, mapper, foreignKeyMessage));
+
+	private async Task<Result<TNext>> ThenDeleteAndGetAsyncCore<TNext>(
+		string sql,
+		Func<T, object?> parametersFactory,
+		Func<T, object> keyFactory,
+		string foreignKeyMessage) {
+		var result = await resultTask.ConfigureAwait(false);
+		if (result.IsFailure) {
+			return result.Error;
+		}
+		return await context.DeleteAndGetAsync<TNext>(sql, parametersFactory(result.Value), keyFactory(result.Value), foreignKeyMessage).Result.ConfigureAwait(false);
+	}
+
+	private async Task<Result<TModel>> ThenDeleteAndGetAsyncCore<TData, TModel>(
+		string sql,
+		Func<T, object?> parametersFactory,
+		Func<T, object> keyFactory,
+		Func<TData, TModel> mapper,
+		string foreignKeyMessage) {
+		var result = await resultTask.ConfigureAwait(false);
+		if (result.IsFailure) {
+			return result.Error;
+		}
+		return await context.DeleteAndGetAsync(sql, parametersFactory(result.Value), keyFactory(result.Value), mapper, foreignKeyMessage).Result.ConfigureAwait(false);
+	}
+
+	private async Task<Result<TModel>> ThenDeleteAndGetOptionalAsyncCore<TData, TModel>(
+		string sql,
+		Func<T, object?> parametersFactory,
+		Func<Optional<TData>, TModel> mapper,
+		string foreignKeyMessage) {
+		var result = await resultTask.ConfigureAwait(false);
+		if (result.IsFailure) {
+			return result.Error;
+		}
+		return await context.DeleteAndGetOptionalAsync(sql, parametersFactory(result.Value), mapper, foreignKeyMessage).Result.ConfigureAwait(false);
 	}
 
 	#endregion
