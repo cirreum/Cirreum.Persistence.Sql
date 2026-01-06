@@ -1786,8 +1786,8 @@ public sealed class SqliteIntegrationTests {
 			.ThenInsertIfAndReturnAsync(
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				user => new { Id = orderId, UserId = user.Id, Amount = 100.0 },
-				_ => orderId,  // Func<T, TResult> - receives the current value
-				_ => false)  // Skip insert
+				when: _ => false,  // Skip insert
+				resultSelector: _ => orderId)
 		, this.TestContext.CancellationToken);
 
 		// Assert
@@ -1819,8 +1819,8 @@ public sealed class SqliteIntegrationTests {
 			.ThenInsertIfAndReturnAsync(
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				user => new { Id = orderId, UserId = user.Id, Amount = 100.0 },
-				user => $"Order for {user.Name}",  // Func<T, TResult> - receives the current value
-				_ => true)  // Execute insert
+				when: _ => true,  // Execute insert
+				resultSelector: user => $"Order for {user.Name}")
 		, this.TestContext.CancellationToken);
 
 		// Assert
@@ -1853,8 +1853,8 @@ public sealed class SqliteIntegrationTests {
 			.ThenInsertIfAndReturnAsync(
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				user => new { Id = orderId, UserId = user.Id, Amount = 100.0 },
-				_ => orderId,  // Transform UserDto -> string (orderId)
-				_ => true)
+				when: _ => true,
+				resultSelector: _ => orderId)
 			.ThenUpdateAsync(  // This should receive string (orderId), not UserDto
 				"UPDATE Orders SET Amount = @Amount WHERE Id = @Id",
 				oid => new { Id = oid, Amount = 200.0 },  // oid is string
@@ -1893,8 +1893,8 @@ public sealed class SqliteIntegrationTests {
 			.ThenInsertIfAndReturnAsync(
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				user => new { Id = Guid.NewGuid().ToString(), UserId = user.Id, Amount = 999.0 },
-				_ => orderId,  // Transform UserDto -> string (orderId)
-				_ => false)  // Skip insert
+				when: _ => false,  // Skip insert
+				resultSelector: _ => orderId)
 			.ThenUpdateAsync(  // This should still receive string (orderId)
 				"UPDATE Orders SET Amount = @Amount WHERE Id = @Id",
 				oid => new { Id = oid, Amount = 300.0 },
@@ -1962,8 +1962,8 @@ public sealed class SqliteIntegrationTests {
 				"UPDATE Users SET Name = @Name WHERE Id = @Id",
 				user => new { user.Id, Name = "UpdatedName" },
 				userId,
-				user => new UserLight(user.Id, user.Name),  // Result selector
-				_ => false)  // Never execute
+				when: _ => false,  // Never execute
+				resultSelector: user => new UserLight(user.Id, user.Name))
 		, this.TestContext.CancellationToken);
 
 		// Assert
@@ -2025,8 +2025,8 @@ public sealed class SqliteIntegrationTests {
 				"UPDATE Users SET Name = @Name WHERE Id = @Id",
 				user => new { user.Id, Name = "UpdatedName" },
 				userId,
-				user => new UserLight(user.Id, user.Name),  // Result selector
-				_ => true)  // Always execute
+				when: _ => true,  // Always execute
+				resultSelector: user => new UserLight(user.Id, user.Name))
 		, this.TestContext.CancellationToken);
 
 		// Assert
@@ -2227,8 +2227,8 @@ public sealed class SqliteIntegrationTests {
 			.ThenInsertIfAndReturnAsync(
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				() => new { Id = orderId, UserId = userId, Amount = 100.0 },
-				() => orderId,
-				when: () => shouldInsert)
+				when: () => shouldInsert,
+				resultSelector: () => orderId)
 		, this.TestContext.CancellationToken);
 
 		// Assert
@@ -2259,8 +2259,8 @@ public sealed class SqliteIntegrationTests {
 			.ThenInsertIfAndReturnAsync(
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				() => new { Id = orderId, UserId = userId, Amount = 100.0 },
-				() => $"Created order {orderId}",
-				when: () => true)
+				when: () => true,
+				resultSelector: () => $"Created order {orderId}")
 		, this.TestContext.CancellationToken);
 
 		// Assert
@@ -2292,8 +2292,8 @@ public sealed class SqliteIntegrationTests {
 				"UPDATE Users SET Name = @Name WHERE Id = @Id",
 				() => new { Id = userId, Name = "UpdatedName" },
 				userId,
-				() => $"User {userId}",
-				when: () => false)
+				when: () => false,
+				resultSelector: () => $"User {userId}")
 		, this.TestContext.CancellationToken);
 
 		// Assert
@@ -2324,8 +2324,8 @@ public sealed class SqliteIntegrationTests {
 				"UPDATE Users SET Name = @Name WHERE Id = @Id",
 				() => new { Id = userId, Name = "UpdatedName" },
 				userId,
-				() => $"Updated user {userId}",
-				when: () => true)
+				when: () => true,
+				resultSelector: () => $"Updated user {userId}")
 		, this.TestContext.CancellationToken);
 
 		// Assert
@@ -2553,8 +2553,8 @@ public sealed class SqliteIntegrationTests {
 				"UPDATE Orders SET Amount = @Amount WHERE UserId = @UserId",
 				user => new { UserId = user.Id, Amount = 150.0 },
 				orderId,
-				user => orderId,  // Transform UserDto -> string (orderId)
-				_ => true)
+				when: _ => true,
+				resultSelector: user => orderId)
 			.ThenUpdateAsync(  // This receives string (orderId)
 				"UPDATE Orders SET Amount = @Amount WHERE Id = @Id",
 				oid => new { Id = oid, Amount = 600.0 },
@@ -2593,8 +2593,8 @@ public sealed class SqliteIntegrationTests {
 				"UPDATE Orders SET Amount = @Amount WHERE UserId = @UserId",
 				user => new { UserId = user.Id, Amount = 999.0 },  // Would set to 999 but will be skipped
 				orderId,
-				user => orderId,  // Transform UserDto -> string (orderId)
-				_ => false)  // Skip this update
+				when: _ => false,  // Skip this update
+				resultSelector: user => orderId)  // Transform UserDto -> string (orderId)
 			.ThenUpdateAsync(  // This should still receive string (orderId)
 				"UPDATE Orders SET Amount = @Amount WHERE Id = @Id",
 				oid => new { Id = oid, Amount = 700.0 },
@@ -2758,7 +2758,7 @@ public sealed class SqliteIntegrationTests {
 		var result = await conn.ExecuteTransactionAsync(ctx =>
 			ctx.UpdateIfAsync(
 				"UPDATE Users SET Name = @Name WHERE Id = @Id",
-				new { Id = userId, Name = "Jane" },
+				() => new { Id = userId, Name = "Jane" },
 				key: userId,
 				when: () => shouldUpdate)
 		, this.TestContext.CancellationToken);
@@ -2786,7 +2786,7 @@ public sealed class SqliteIntegrationTests {
 		var result = await conn.ExecuteTransactionAsync(ctx =>
 			ctx.UpdateIfAsync(
 				"UPDATE Users SET Name = @Name WHERE Id = @Id",
-				new { Id = userId, Name = "Jane" },
+				() => new { Id = userId, Name = "Jane" },
 				key: userId,
 				when: () => shouldUpdate)
 		, this.TestContext.CancellationToken);
@@ -2814,7 +2814,7 @@ public sealed class SqliteIntegrationTests {
 		var result = await conn.ExecuteTransactionAsync<string>(ctx =>
 			ctx.UpdateIfAndReturnAsync(
 				"UPDATE Users SET Name = @Name WHERE Id = @Id",
-				new { Id = userId, Name = "Jane" },
+				() => new { Id = userId, Name = "Jane" },
 				key: userId,
 				resultSelector: () => "updated",
 				when: () => shouldUpdate)
@@ -2844,7 +2844,7 @@ public sealed class SqliteIntegrationTests {
 		var result = await conn.ExecuteTransactionAsync<string>(ctx =>
 			ctx.UpdateIfAndReturnAsync(
 				"UPDATE Users SET Name = @Name WHERE Id = @Id",
-				new { Id = userId, Name = "Jane" },
+				() => new { Id = userId, Name = "Jane" },
 				key: userId,
 				resultSelector: () => "skipped",
 				when: () => shouldUpdate)
@@ -2874,7 +2874,7 @@ public sealed class SqliteIntegrationTests {
 		var result = await conn.ExecuteTransactionAsync(ctx =>
 			ctx.DeleteIfAsync(
 				"DELETE FROM Users WHERE Id = @Id",
-				new { Id = userId },
+				() => new { Id = userId },
 				key: userId,
 				when: () => shouldDelete)
 		, this.TestContext.CancellationToken);
@@ -2902,7 +2902,7 @@ public sealed class SqliteIntegrationTests {
 		var result = await conn.ExecuteTransactionAsync(ctx =>
 			ctx.DeleteIfAsync(
 				"DELETE FROM Users WHERE Id = @Id",
-				new { Id = userId },
+				() => new { Id = userId },
 				key: userId,
 				when: () => shouldDelete)
 		, this.TestContext.CancellationToken);

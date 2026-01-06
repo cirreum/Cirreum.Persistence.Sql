@@ -1,6 +1,5 @@
 namespace Cirreum.Persistence;
 
-using Cirreum.Exceptions;
 using System.Runtime.CompilerServices;
 
 /// <summary>
@@ -594,24 +593,24 @@ public readonly struct DbResult<T>(DbContext context, Task<Result<T>> resultTask
 	/// </summary>
 	/// <param name="sql">The INSERT SQL statement.</param>
 	/// <param name="parametersFactory">Factory to create parameters from the current value.</param>
-	/// <param name="resultSelector">Factory to create the result value from the current value, called after successful insert or when skipped.</param>
 	/// <param name="when">A condition that determines whether to execute the insert; if false, the insert is skipped.</param>
+	/// <param name="resultSelector">Factory to create the result value from the current value, called after successful insert or when skipped.</param>
 	/// <param name="uniqueConstraintMessage">Error message for unique constraint violations.</param>
 	/// <param name="foreignKeyMessage">Error message for foreign key violations.</param>
 	public DbResult<TResult> ThenInsertIfAndReturnAsync<TResult>(
 		string sql,
 		Func<T, object?> parametersFactory,
-		Func<T, TResult> resultSelector,
 		bool when,
+		Func<T, TResult> resultSelector,
 		string uniqueConstraintMessage = "Record already exists",
 		string? foreignKeyMessage = "Referenced record does not exist")
-		=> new(context, this.ThenInsertIfAndReturnAsyncCore(sql, parametersFactory, resultSelector, when, uniqueConstraintMessage, foreignKeyMessage));
+		=> new(context, this.ThenInsertIfAndReturnAsyncCore(sql, parametersFactory, when, resultSelector, uniqueConstraintMessage, foreignKeyMessage));
 
 	private async Task<Result<TResult>> ThenInsertIfAndReturnAsyncCore<TResult>(
 		string sql,
 		Func<T, object?> parametersFactory,
-		Func<T, TResult> resultSelector,
 		bool when,
+		Func<T, TResult> resultSelector,
 		string uniqueConstraintMessage,
 		string? foreignKeyMessage) {
 		var result = await resultTask.ConfigureAwait(false);
@@ -636,24 +635,24 @@ public readonly struct DbResult<T>(DbContext context, Task<Result<T>> resultTask
 	/// </summary>
 	/// <param name="sql">The INSERT SQL statement.</param>
 	/// <param name="parametersFactory">Factory to create parameters from the current value.</param>
-	/// <param name="resultSelector">Factory to create the result value from the current value, called after successful insert or when skipped.</param>
 	/// <param name="when">Predicate that determines whether to execute the insert; if false, the insert is skipped.</param>
+	/// <param name="resultSelector">Factory to create the result value from the current value, called after successful insert or when skipped.</param>
 	/// <param name="uniqueConstraintMessage">Error message for unique constraint violations.</param>
 	/// <param name="foreignKeyMessage">Error message for foreign key violations.</param>
 	public DbResult<TResult> ThenInsertIfAndReturnAsync<TResult>(
 		string sql,
 		Func<T, object?> parametersFactory,
-		Func<T, TResult> resultSelector,
 		Func<T, bool> when,
+		Func<T, TResult> resultSelector,
 		string uniqueConstraintMessage = "Record already exists",
 		string? foreignKeyMessage = "Referenced record does not exist")
-		=> new(context, this.ThenInsertIfAndReturnAsyncCore(sql, parametersFactory, resultSelector, when, uniqueConstraintMessage, foreignKeyMessage));
+		=> new(context, this.ThenInsertIfAndReturnAsyncCore(sql, parametersFactory, when, resultSelector, uniqueConstraintMessage, foreignKeyMessage));
 
 	private async Task<Result<TResult>> ThenInsertIfAndReturnAsyncCore<TResult>(
 		string sql,
 		Func<T, object?> parametersFactory,
-		Func<T, TResult> resultSelector,
 		Func<T, bool> when,
+		Func<T, TResult> resultSelector,
 		string uniqueConstraintMessage,
 		string? foreignKeyMessage) {
 		var result = await resultTask.ConfigureAwait(false);
@@ -710,7 +709,7 @@ public readonly struct DbResult<T>(DbContext context, Task<Result<T>> resultTask
 		bool when,
 		string uniqueConstraintMessage = "Record already exists",
 		string? foreignKeyMessage = "Referenced record does not exist") where TEntity : class
-		=> this.ThenInsertIfAndReturnAsync(sql, _ => entity, _ => entity, when, uniqueConstraintMessage, foreignKeyMessage);
+		=> this.ThenInsertIfAndReturnAsync(sql, _ => entity, when, _ => entity, uniqueConstraintMessage, foreignKeyMessage);
 
 	/// <summary>
 	/// Conditionally chains an INSERT operation using the entity as both parameters and return value.
@@ -728,7 +727,7 @@ public readonly struct DbResult<T>(DbContext context, Task<Result<T>> resultTask
 		Func<T, bool> when,
 		string uniqueConstraintMessage = "Record already exists",
 		string? foreignKeyMessage = "Referenced record does not exist") where TEntity : class
-		=> this.ThenInsertIfAndReturnAsync(sql, _ => entity, _ => entity, when, uniqueConstraintMessage, foreignKeyMessage);
+		=> this.ThenInsertIfAndReturnAsync(sql, _ => entity, when, _ => entity, uniqueConstraintMessage, foreignKeyMessage);
 
 	#endregion
 
@@ -1054,26 +1053,26 @@ public readonly struct DbResult<T>(DbContext context, Task<Result<T>> resultTask
 	/// <param name="sql">The UPDATE SQL statement.</param>
 	/// <param name="parametersFactory">Factory to create parameters from the current value.</param>
 	/// <param name="key">The key for not-found error messages.</param>
-	/// <param name="resultSelector">Factory to create the result value from the current value, called after successful update or when skipped.</param>
 	/// <param name="when">A condition that determines whether to execute the update; if false, the update is skipped.</param>
+	/// <param name="resultSelector">Factory to create the result value from the current value, called after successful update or when skipped.</param>
 	/// <param name="uniqueConstraintMessage">Error message for unique constraint violations.</param>
 	/// <param name="foreignKeyMessage">Error message for foreign key violations.</param>
 	public DbResult<TResult> ThenUpdateIfAndReturnAsync<TResult>(
 		string sql,
 		Func<T, object?> parametersFactory,
 		object key,
-		Func<T, TResult> resultSelector,
 		bool when,
+		Func<T, TResult> resultSelector,
 		string uniqueConstraintMessage = "Record already exists",
 		string? foreignKeyMessage = "Referenced record does not exist")
-		=> new(context, this.ThenUpdateIfAndReturnAsyncCore(sql, parametersFactory, key, resultSelector, when, uniqueConstraintMessage, foreignKeyMessage));
+		=> new(context, this.ThenUpdateIfAndReturnAsyncCore(sql, parametersFactory, key, when, resultSelector, uniqueConstraintMessage, foreignKeyMessage));
 
 	private async Task<Result<TResult>> ThenUpdateIfAndReturnAsyncCore<TResult>(
 		string sql,
 		Func<T, object?> parametersFactory,
 		object key,
-		Func<T, TResult> resultSelector,
 		bool when,
+		Func<T, TResult> resultSelector,
 		string uniqueConstraintMessage,
 		string? foreignKeyMessage) {
 		var result = await resultTask.ConfigureAwait(false);
@@ -1101,27 +1100,27 @@ public readonly struct DbResult<T>(DbContext context, Task<Result<T>> resultTask
 	/// <param name="sql">The UPDATE SQL statement.</param>
 	/// <param name="parametersFactory">Factory to create parameters from the current value.</param>
 	/// <param name="key">The key for not-found error messages.</param>
-	/// <param name="resultSelector">Factory to create the result value from the current value, called after successful update or when skipped.</param>
 	/// <param name="when">Predicate that determines whether to execute the update; if false, the update is skipped.</param>
+	/// <param name="resultSelector">Factory to create the result value from the current value, called after successful update or when skipped.</param>
 	/// <param name="uniqueConstraintMessage">Error message for unique constraint violations.</param>
 	/// <param name="foreignKeyMessage">Error message for foreign key violations.</param>
 	public DbResult<TResult> ThenUpdateIfAndReturnAsync<TResult>(
 		string sql,
 		Func<T, object?> parametersFactory,
 		object key,
-		Func<T, TResult> resultSelector,
 		Func<T, bool> when,
+		Func<T, TResult> resultSelector,
 		string uniqueConstraintMessage = "Record already exists",
 		string? foreignKeyMessage = "Referenced record does not exist")
-		=> new(context, this.ThenUpdateIfAndReturnAsyncCore(sql, parametersFactory, key, resultSelector, when, uniqueConstraintMessage, foreignKeyMessage));
+		=> new(context, this.ThenUpdateIfAndReturnAsyncCore(sql, parametersFactory, key, when, resultSelector, uniqueConstraintMessage, foreignKeyMessage));
 
 
 	private async Task<Result<TResult>> ThenUpdateIfAndReturnAsyncCore<TResult>(
 		string sql,
 		Func<T, object?> parametersFactory,
 		object key,
-		Func<T, TResult> resultSelector,
 		Func<T, bool> when,
+		Func<T, TResult> resultSelector,
 		string uniqueConstraintMessage,
 		string? foreignKeyMessage) {
 		var result = await resultTask.ConfigureAwait(false);
@@ -1451,24 +1450,24 @@ public readonly struct DbResult<T>(DbContext context, Task<Result<T>> resultTask
 	/// <param name="sql">The DELETE SQL statement.</param>
 	/// <param name="parametersFactory">Factory to create parameters from the current value.</param>
 	/// <param name="key">The key for not-found error messages.</param>
-	/// <param name="resultSelector">Factory to create the result value from the current value, called after successful delete or when skipped.</param>
 	/// <param name="when">A condition that determines whether to execute the delete; if false, the delete is skipped.</param>
+	/// <param name="resultSelector">Factory to create the result value from the current value, called after successful delete or when skipped.</param>
 	/// <param name="foreignKeyMessage">Error message for foreign key violations.</param>
 	public DbResult<TResult> ThenDeleteIfAndReturnAsync<TResult>(
 		string sql,
 		Func<T, object?> parametersFactory,
 		object key,
-		Func<T, TResult> resultSelector,
 		bool when,
+		Func<T, TResult> resultSelector,
 		string foreignKeyMessage = "Cannot delete, record is in use")
-		=> new(context, this.ThenDeleteIfAndReturnAsyncCore(sql, parametersFactory, key, resultSelector, when, foreignKeyMessage));
+		=> new(context, this.ThenDeleteIfAndReturnAsyncCore(sql, parametersFactory, key, when, resultSelector, foreignKeyMessage));
 
 	private async Task<Result<TResult>> ThenDeleteIfAndReturnAsyncCore<TResult>(
 		string sql,
 		Func<T, object?> parametersFactory,
 		object key,
-		Func<T, TResult> resultSelector,
 		bool when,
+		Func<T, TResult> resultSelector,
 		string foreignKeyMessage) {
 		var result = await resultTask.ConfigureAwait(false);
 		if (result.IsFailure) {
@@ -1495,24 +1494,24 @@ public readonly struct DbResult<T>(DbContext context, Task<Result<T>> resultTask
 	/// <param name="sql">The DELETE SQL statement.</param>
 	/// <param name="parametersFactory">Factory to create parameters from the current value.</param>
 	/// <param name="key">The key for not-found error messages.</param>
-	/// <param name="resultSelector">Factory to create the result value from the current value, called after successful delete or when skipped.</param>
 	/// <param name="when">Predicate that determines whether to execute the delete; if false, the delete is skipped.</param>
+	/// <param name="resultSelector">Factory to create the result value from the current value, called after successful delete or when skipped.</param>
 	/// <param name="foreignKeyMessage">Error message for foreign key violations.</param>
 	public DbResult<TResult> ThenDeleteIfAndReturnAsync<TResult>(
 		string sql,
 		Func<T, object?> parametersFactory,
 		object key,
-		Func<T, TResult> resultSelector,
 		Func<T, bool> when,
+		Func<T, TResult> resultSelector,
 		string foreignKeyMessage = "Cannot delete, record is in use")
-		=> new(context, this.ThenDeleteIfAndReturnAsyncCore(sql, parametersFactory, key, resultSelector, when, foreignKeyMessage));
+		=> new(context, this.ThenDeleteIfAndReturnAsyncCore(sql, parametersFactory, key, when, resultSelector, foreignKeyMessage));
 
 	private async Task<Result<TResult>> ThenDeleteIfAndReturnAsyncCore<TResult>(
 		string sql,
 		Func<T, object?> parametersFactory,
 		object key,
-		Func<T, TResult> resultSelector,
 		Func<T, bool> when,
+		Func<T, TResult> resultSelector,
 		string foreignKeyMessage) {
 		var result = await resultTask.ConfigureAwait(false);
 		if (result.IsFailure) {

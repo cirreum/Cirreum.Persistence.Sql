@@ -1541,6 +1541,65 @@ public static class SqlConnectionFactoryExtensions {
 				cancellationToken: cancellationToken);
 		}
 
+		/// <summary>
+		/// Executes a DELETE command and returns the specified value if at least one row was affected.
+		/// </summary>
+		/// <remarks>
+		/// <para>
+		/// Use this method for DELETE operations where you need to return a value (typically the deleted entity's ID)
+		/// while still checking that a row was actually deleted.
+		/// Returns <see cref="NotFoundException"/> (HTTP 404) if no rows were deleted.
+		/// Foreign key violations become <see cref="ConflictException"/> (HTTP 409, record is still referenced by other records).
+		/// </para>
+		/// <para>
+		/// <strong>SQL Pattern:</strong>
+		/// </para>
+		/// <code>
+		/// DELETE FROM Orders
+		/// WHERE OrderId = @OrderId
+		/// </code>
+		/// <para>
+		/// <strong>Usage Pattern:</strong>
+		/// </para>
+		/// <code>
+		/// var orderId = command.OrderId;
+		///
+		/// return await factory.DeleteAndReturnAsync(
+		///     "DELETE FROM Orders WHERE OrderId = @OrderId",
+		///     new { OrderId = orderId },
+		///     key: orderId,
+		///     () =&gt; orderId,
+		///     foreignKeyMessage: "Cannot delete order, it has associated line items",
+		///     cancellationToken: cancellationToken);
+		/// </code>
+		/// </remarks>
+		/// <typeparam name="T">The type of the value to return on success.</typeparam>
+		/// <param name="sql">The SQL DELETE statement to execute.</param>
+		/// <param name="parameters">An object containing the parameters to be passed to the SQL command, or <see langword="null"/> if no parameters are required.</param>
+		/// <param name="key">The key of the entity being deleted, used in the <see cref="NotFoundException"/> if no rows are affected.</param>
+		/// <param name="resultSelector">A function that returns the value to include in the successful result.</param>
+		/// <param name="foreignKeyMessage">The error message to use if a foreign key violation occurs.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task that represents the asynchronous operation. The task result contains a <see cref="Result{T}"/>
+		/// with the value from <paramref name="resultSelector"/> if at least one row was deleted, or a failure result with an appropriate exception.</returns>
+		public async Task<Result<T>> DeleteAndReturnAsync<T>(
+			string sql,
+			object? parameters,
+			object key,
+			Func<T> resultSelector,
+			string foreignKeyMessage = "Cannot delete, record is in use",
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.DeleteAndReturnAsync(
+				sql,
+				parameters,
+				key,
+				resultSelector,
+				foreignKeyMessage,
+				transaction: null,
+				cancellationToken: cancellationToken);
+		}
+
 		#endregion
 
 		#region INSERT AND GET

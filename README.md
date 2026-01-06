@@ -395,12 +395,24 @@ public async Task<Result<Guid>> UpdateOrderAsync(UpdateOrder command, Cancellati
 
 ### Delete
 ```csharp
+// Simple delete - returns Result (success/failure only)
 public async Task<Result> DeleteOrderAsync(Guid orderId, CancellationToken ct)
 {
     return await db.DeleteAsync(
         "DELETE FROM Orders WHERE OrderId = @OrderId",
         new { OrderId = orderId },
         key: orderId,  // Returns NotFound if 0 rows affected
+        ct);
+}
+
+// Delete with return value - returns Result<T>
+public async Task<Result<Guid>> DeleteOrderAsync(Guid orderId, CancellationToken ct)
+{
+    return await db.DeleteAndReturnAsync(
+        "DELETE FROM Orders WHERE OrderId = @OrderId",
+        new { OrderId = orderId },
+        key: orderId,
+        () => orderId,  // Return the ID on success
         ct);
 }
 ```
@@ -669,8 +681,10 @@ public async Task<Result<OrderDto>> CreateOrderWithItemsAsync(
 
 *Delete Methods:*
 - `DeleteAsync(...)` - Delete, returns `DbResult`
+- `DeleteAndReturnAsync<T>(...)` - Delete, returns `DbResult<T>`
 - `DeleteWithCountAsync(...)` - Delete, returns `DbResult<int>` (rows affected)
 - `DeleteIfAsync(..., when)` - Conditional delete, returns `DbResult`
+- `DeleteIfAndReturnAsync<T>(..., when)` - Conditional delete, returns `DbResult<T>`
 
 **From `DbResult<T>` (typed result):**
 

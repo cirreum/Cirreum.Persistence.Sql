@@ -5,7 +5,8 @@
       "Bash(grep:*)",
       "Bash(dotnet build:*)",
       "Bash(dir:*)",
-      "Bash(git diff:*)"
+      "Bash(git diff:*)",
+      "Bash(cat:*)"
     ]
   }
 }

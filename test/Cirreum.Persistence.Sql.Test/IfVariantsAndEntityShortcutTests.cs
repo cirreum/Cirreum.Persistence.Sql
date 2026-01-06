@@ -178,8 +178,8 @@ public sealed class IfVariantsAndEntityShortcutTests {
 			.ThenInsertIfAndReturnAsync(
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				() => new { Id = orderId, UserId = userId, Amount = 100.0 },
-				() => orderId,
-				when: true)
+				when: true,
+				resultSelector: () => orderId)
 		, this.TestContext.CancellationToken);
 
 		// Assert
@@ -206,8 +206,8 @@ public sealed class IfVariantsAndEntityShortcutTests {
 			.ThenInsertIfAndReturnAsync(
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				() => new { Id = orderId, UserId = userId, Amount = 100.0 },
-				() => orderId, // resultSelector is still called when skipped
-				when: false)
+				when: false,
+				resultSelector: () => orderId)
 		, this.TestContext.CancellationToken);
 
 		// Assert
@@ -563,8 +563,8 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				"UPDATE Users SET Name = @Name WHERE Id = @Id",
 				u => new { u.Id, Name = "Jane" },
 				userId,
-				u => $"Updated {u.Name}",
-				when: _ => true)
+				when: _ => true,
+				resultSelector: u => $"Updated {u.Name}")
 		, this.TestContext.CancellationToken);
 
 		// Assert
@@ -594,8 +594,8 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				"UPDATE Users SET Name = @Name WHERE Id = @Id",
 				u => new { u.Id, Name = "Jane" },
 				userId,
-				u => $"Skipped {u.Name}",
-				when: _ => false)
+				when: _ => false,
+				resultSelector: u => $"Skipped {u.Name}")
 		, this.TestContext.CancellationToken);
 
 		// Assert
@@ -628,8 +628,8 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				"DELETE FROM Orders WHERE Id = @Id",
 				o => new { o.Id },
 				orderId,
-				o => $"Deleted order {o.Amount}",
-				when: _ => true)
+				when: _ => true,
+				resultSelector: o => $"Deleted order {o.Amount}")
 		, this.TestContext.CancellationToken);
 
 		// Assert

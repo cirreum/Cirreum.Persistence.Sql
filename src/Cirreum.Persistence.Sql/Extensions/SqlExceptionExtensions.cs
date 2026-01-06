@@ -163,6 +163,29 @@ public static class SqlExceptionExtensions {
 	}
 
 	/// <summary>
+	/// Tries to convert an exception to a failed <see cref="Result{T}"/> for DELETE operations.
+	/// Used for DELETE operations where FK violations mean the record is still in use.
+	/// </summary>
+	/// <typeparam name="T">The type of the result value.</typeparam>
+	/// <param name="ex">The exception to convert.</param>
+	/// <param name="foreignKeyMessage">The message to use for foreign key violations.</param>
+	/// <param name="result">The resulting <see cref="Result{T}"/> if a foreign key violation was detected.</param>
+	/// <returns>True if the exception was a foreign key violation and was converted; otherwise, false.</returns>
+	public static bool TryToDeleteResult<T>(
+		this Exception ex,
+		string foreignKeyMessage,
+		out Result<T> result) {
+
+		if (ex.IsForeignKeyViolation()) {
+			result = Result.Conflict<T>(foreignKeyMessage);
+			return true;
+		}
+
+		result = default;
+		return false;
+	}
+
+	/// <summary>
 	/// Converts a database exception to an appropriate <see cref="Result"/> based on the error type.
 	/// Uses the exception's message for constraint violations.
 	/// </summary>
