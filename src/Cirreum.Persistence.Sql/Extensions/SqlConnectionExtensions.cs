@@ -759,6 +759,214 @@ public static class SqlConnectionExtensions {
 
 		#endregion
 
+		#region GET PAGED
+
+		/// <summary>
+		/// Executes a SQL batch containing a count query and a data query, returning a paginated result.
+		/// </summary>
+		/// <remarks>
+		/// <para>
+		/// The SQL should contain two statements: first a <c>SELECT COUNT(*)</c> query, then a data query with an
+		/// <c>ORDER BY</c> clause. If the data query does not already contain an <c>OFFSET</c> clause, one will be
+		/// appended automatically.
+		/// </para>
+		/// <para>
+		/// This method automatically injects <c>@PageSize</c> and <c>@Offset</c> parameters. Your SQL can reference
+		/// these directly, or omit the OFFSET clause entirely to have it appended automatically.
+		/// </para>
+		/// <example>
+		/// <code>
+		/// // SQL without OFFSET (will be appended automatically):
+		/// var sql = @"
+		///     SELECT COUNT(*) FROM Orders WHERE CustomerId = @CustomerId;
+		///     SELECT * FROM Orders WHERE CustomerId = @CustomerId ORDER BY CreatedAt DESC";
+		///
+		/// // SQL with explicit OFFSET:
+		/// var sql = @"
+		///     SELECT COUNT(*) FROM Orders WHERE CustomerId = @CustomerId;
+		///     SELECT * FROM Orders WHERE CustomerId = @CustomerId
+		///     ORDER BY CreatedAt DESC
+		///     OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+		/// </code>
+		/// </example>
+		/// </remarks>
+		/// <typeparam name="T">The type of the elements to be returned in the paged result.</typeparam>
+		/// <param name="sql">The SQL batch to execute. Should contain a COUNT query followed by a data query with ORDER BY.</param>
+		/// <param name="pageSize">The number of items per page.</param>
+		/// <param name="page">The current page number (1-based).</param>
+		/// <param name="transaction">An optional transaction within which the command executes.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task that represents the asynchronous operation. The task result contains a <see cref="Result{T}"/>
+		/// wrapping a <see cref="PagedResult{T}"/> with the queried items and pagination metadata.</returns>
+		public Task<Result<PagedResult<T>>> GetPagedAsync<T>(
+			string sql,
+			int pageSize,
+			int page,
+			IDbTransaction? transaction = null,
+			CancellationToken cancellationToken = default)
+			=> conn.GetPagedAsync<T>(sql, new { PageSize = pageSize, Page = page }, transaction, cancellationToken);
+
+		/// <summary>
+		/// Executes a SQL batch containing a count query and a data query, returning a paginated result.
+		/// </summary>
+		/// <remarks>
+		/// <para>
+		/// The SQL should contain two statements: first a <c>SELECT COUNT(*)</c> query, then a data query with an
+		/// <c>ORDER BY</c> clause. If the data query does not already contain an <c>OFFSET</c> clause, one will be
+		/// appended automatically.
+		/// </para>
+		/// <para>
+		/// The <paramref name="parameters"/> object must include <c>PageSize</c> and <c>Page</c> properties (both <c>int</c>).
+		/// The <c>@Offset</c> parameter is calculated automatically from these values.
+		/// </para>
+		/// <example>
+		/// <code>
+		/// public record GetOrdersQuery(Guid CustomerId, int PageSize, int Page);
+		///
+		/// var sql = @"
+		///     SELECT COUNT(*) FROM Orders WHERE CustomerId = @CustomerId;
+		///     SELECT * FROM Orders WHERE CustomerId = @CustomerId ORDER BY CreatedAt DESC";
+		///
+		/// var result = await connection.GetPagedAsync&lt;Order&gt;(sql, query);
+		/// </code>
+		/// </example>
+		/// </remarks>
+		/// <typeparam name="T">The type of the elements to be returned in the paged result.</typeparam>
+		/// <param name="sql">The SQL batch to execute. Should contain a COUNT query followed by a data query with ORDER BY.</param>
+		/// <param name="parameters">An object containing the query parameters, including <c>PageSize</c> and <c>Page</c> properties.</param>
+		/// <param name="transaction">An optional transaction within which the command executes.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task that represents the asynchronous operation. The task result contains a <see cref="Result{T}"/>
+		/// wrapping a <see cref="PagedResult{T}"/> with the queried items and pagination metadata.</returns>
+		public async Task<Result<PagedResult<T>>> GetPagedAsync<T>(
+			string sql,
+			object parameters,
+			IDbTransaction? transaction = null,
+			CancellationToken cancellationToken = default) {
+
+			var finalSql = SqlDialectHelper.AppendOffsetIfNeeded(sql, conn);
+			var (mergedParams, pageSize, page) = ParameterHelper.MergeWithPaging(parameters);
+
+			IMultipleResult reader;
+			try {
+				reader = await conn
+					.QueryMultipleAsync(finalSql, mergedParams, transaction, cancellationToken)
+					.ConfigureAwait(false);
+			} catch (Exception ex) {
+				return ex.ToResult<PagedResult<T>>();
+			}
+
+			await using (reader) {
+				try {
+					var totalCount = await reader.ReadFirstOrDefaultAsync<int>().ConfigureAwait(false);
+					var items = await reader.ReadAsync<T>().ConfigureAwait(false);
+
+					return new PagedResult<T>(
+						[.. items],
+						totalCount,
+						pageSize,
+						page
+					);
+				} catch (Exception ex) {
+					return ex.ToResult<PagedResult<T>>();
+				}
+			}
+		}
+
+		/// <summary>
+		/// Executes a SQL batch containing a count query and a data query, returning a paginated result with mapped items.
+		/// </summary>
+		/// <remarks>
+		/// <para>
+		/// The SQL should contain two statements: first a <c>SELECT COUNT(*)</c> query, then a data query with an
+		/// <c>ORDER BY</c> clause. If the data query does not already contain an <c>OFFSET</c> clause, one will be
+		/// appended automatically.
+		/// </para>
+		/// <para>
+		/// This method automatically injects <c>@PageSize</c> and <c>@Offset</c> parameters. Your SQL can reference
+		/// these directly, or omit the OFFSET clause entirely to have it appended automatically.
+		/// </para>
+		/// </remarks>
+		/// <typeparam name="TData">The type of the elements returned by the SQL query (data layer).</typeparam>
+		/// <typeparam name="TModel">The type of the elements in the final paged result (domain layer).</typeparam>
+		/// <param name="sql">The SQL batch to execute. Should contain a COUNT query followed by a data query with ORDER BY.</param>
+		/// <param name="pageSize">The number of items per page.</param>
+		/// <param name="page">The current page number (1-based).</param>
+		/// <param name="mapper">A function to transform each data item to the domain model.</param>
+		/// <param name="transaction">An optional transaction within which the command executes.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task that represents the asynchronous operation. The task result contains a <see cref="Result{T}"/>
+		/// wrapping a <see cref="PagedResult{T}"/> with the mapped items and pagination metadata.</returns>
+		public Task<Result<PagedResult<TModel>>> GetPagedAsync<TData, TModel>(
+			string sql,
+			int pageSize,
+			int page,
+			Func<TData, TModel> mapper,
+			IDbTransaction? transaction = null,
+			CancellationToken cancellationToken = default)
+			=> conn.GetPagedAsync(sql, new { PageSize = pageSize, Page = page }, mapper, transaction, cancellationToken);
+
+		/// <summary>
+		/// Executes a SQL batch containing a count query and a data query, returning a paginated result with mapped items.
+		/// </summary>
+		/// <remarks>
+		/// <para>
+		/// The SQL should contain two statements: first a <c>SELECT COUNT(*)</c> query, then a data query with an
+		/// <c>ORDER BY</c> clause. If the data query does not already contain an <c>OFFSET</c> clause, one will be
+		/// appended automatically.
+		/// </para>
+		/// <para>
+		/// The <paramref name="parameters"/> object must include <c>PageSize</c> and <c>Page</c> properties (both <c>int</c>).
+		/// The <c>@Offset</c> parameter is calculated automatically from these values.
+		/// </para>
+		/// </remarks>
+		/// <typeparam name="TData">The type of the elements returned by the SQL query (data layer).</typeparam>
+		/// <typeparam name="TModel">The type of the elements in the final paged result (domain layer).</typeparam>
+		/// <param name="sql">The SQL batch to execute. Should contain a COUNT query followed by a data query with ORDER BY.</param>
+		/// <param name="parameters">An object containing the query parameters, including <c>PageSize</c> and <c>Page</c> properties.</param>
+		/// <param name="mapper">A function to transform each data item to the domain model.</param>
+		/// <param name="transaction">An optional transaction within which the command executes.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task that represents the asynchronous operation. The task result contains a <see cref="Result{T}"/>
+		/// wrapping a <see cref="PagedResult{T}"/> with the mapped items and pagination metadata.</returns>
+		public async Task<Result<PagedResult<TModel>>> GetPagedAsync<TData, TModel>(
+			string sql,
+			object parameters,
+			Func<TData, TModel> mapper,
+			IDbTransaction? transaction = null,
+			CancellationToken cancellationToken = default) {
+
+			var finalSql = SqlDialectHelper.AppendOffsetIfNeeded(sql, conn);
+			var (mergedParams, pageSize, page) = ParameterHelper.MergeWithPaging(parameters);
+
+			IMultipleResult reader;
+			try {
+				reader = await conn
+					.QueryMultipleAsync(finalSql, mergedParams, transaction, cancellationToken)
+					.ConfigureAwait(false);
+			} catch (Exception ex) {
+				return ex.ToResult<PagedResult<TModel>>();
+			}
+
+			await using (reader) {
+				try {
+					var totalCount = await reader.ReadFirstOrDefaultAsync<int>().ConfigureAwait(false);
+					var items = await reader.ReadAsync<TData>().ConfigureAwait(false);
+
+					return new PagedResult<TModel>(
+						[.. items.Select(mapper)],
+						totalCount,
+						pageSize,
+						page
+					);
+				} catch (Exception ex) {
+					return ex.ToResult<PagedResult<TModel>>();
+				}
+			}
+		}
+
+		#endregion
+
 		#region QUERY CURSOR
 
 		/// <summary>
@@ -2476,6 +2684,140 @@ public static class SqlConnectionExtensions {
 			}
 		}
 
+		/// <summary>
+		/// Executes a query returning multiple result sets and processes them using the provided mapper.
+		/// Returns a failure with <see cref="NotFoundException"/> if the mapper returns null.
+		/// </summary>
+		/// <typeparam name="T1">The type of the first element in the returned tuple.</typeparam>
+		/// <typeparam name="T2">The type of the second element in the returned tuple.</typeparam>
+		/// <param name="sql">The SQL query to execute. Should return multiple result sets.</param>
+		/// <param name="keys">The keys used to identify the resource for the <see cref="NotFoundException"/>.</param>
+		/// <param name="mapper">An async function that reads from the <see cref="IMultipleResult"/> and returns the tuple value.</param>
+		/// <param name="transaction">An optional transaction within which the command executes.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task representing the asynchronous operation. The result contains a <see cref="Result{T}"/> object with the
+		/// tuple value, or a NotFound result if the mapper returns null.</returns>
+		public Task<Result<(T1, T2)>> MultipleGetAsync<T1, T2>(
+			string sql,
+			object[] keys,
+			Func<IMultipleResult, Task<(T1, T2)?>> mapper,
+			IDbTransaction? transaction = null,
+			CancellationToken cancellationToken = default)
+			=> conn.MultipleGetAsync(sql, null, keys, mapper, transaction, cancellationToken);
+
+		/// <summary>
+		/// Executes a query returning multiple result sets and processes them using the provided mapper.
+		/// Returns a failure with <see cref="NotFoundException"/> if the mapper returns null.
+		/// </summary>
+		/// <typeparam name="T1">The type of the first element in the returned tuple.</typeparam>
+		/// <typeparam name="T2">The type of the second element in the returned tuple.</typeparam>
+		/// <param name="sql">The SQL query to execute. Should return multiple result sets.</param>
+		/// <param name="parameters">An object containing the parameters to be passed to the SQL query, or <see langword="null"/> if no parameters are required.</param>
+		/// <param name="keys">The keys used to identify the resource for the <see cref="NotFoundException"/>.</param>
+		/// <param name="mapper">An async function that reads from the <see cref="IMultipleResult"/> and returns the tuple value.</param>
+		/// <param name="transaction">An optional transaction within which the command executes.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task representing the asynchronous operation. The result contains a <see cref="Result{T}"/> object with the
+		/// tuple value, or a NotFound result if the mapper returns null.</returns>
+		public async Task<Result<(T1, T2)>> MultipleGetAsync<T1, T2>(
+			string sql,
+			object? parameters,
+			object[] keys,
+			Func<IMultipleResult, Task<(T1, T2)?>> mapper,
+			IDbTransaction? transaction = null,
+			CancellationToken cancellationToken = default) {
+
+			IMultipleResult reader;
+			try {
+				reader = await conn
+					.QueryMultipleAsync(sql, parameters, transaction, cancellationToken)
+					.ConfigureAwait(false);
+			} catch (Exception ex) {
+				return ex.ToResult<(T1, T2)>();
+			}
+
+			await using (reader) {
+				(T1, T2)? result;
+				try {
+					result = await mapper(reader).ConfigureAwait(false);
+				} catch (Exception ex) {
+					return ex.ToResult<(T1, T2)>();
+				}
+
+				return result is null
+					? Result.NotFound<(T1, T2)>(keys)
+					: Result<(T1, T2)>.Success(result.Value);
+			}
+		}
+
+		/// <summary>
+		/// Executes a query returning multiple result sets and processes them using the provided mapper.
+		/// Returns a failure with <see cref="NotFoundException"/> if the mapper returns null.
+		/// </summary>
+		/// <typeparam name="T1">The type of the first element in the returned tuple.</typeparam>
+		/// <typeparam name="T2">The type of the second element in the returned tuple.</typeparam>
+		/// <typeparam name="T3">The type of the third element in the returned tuple.</typeparam>
+		/// <param name="sql">The SQL query to execute. Should return multiple result sets.</param>
+		/// <param name="keys">The keys used to identify the resource for the <see cref="NotFoundException"/>.</param>
+		/// <param name="mapper">An async function that reads from the <see cref="IMultipleResult"/> and returns the tuple value.</param>
+		/// <param name="transaction">An optional transaction within which the command executes.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task representing the asynchronous operation. The result contains a <see cref="Result{T}"/> object with the
+		/// tuple value, or a NotFound result if the mapper returns null.</returns>
+		public Task<Result<(T1, T2, T3)>> MultipleGetAsync<T1, T2, T3>(
+			string sql,
+			object[] keys,
+			Func<IMultipleResult, Task<(T1, T2, T3)?>> mapper,
+			IDbTransaction? transaction = null,
+			CancellationToken cancellationToken = default)
+			=> conn.MultipleGetAsync(sql, null, keys, mapper, transaction, cancellationToken);
+
+		/// <summary>
+		/// Executes a query returning multiple result sets and processes them using the provided mapper.
+		/// Returns a failure with <see cref="NotFoundException"/> if the mapper returns null.
+		/// </summary>
+		/// <typeparam name="T1">The type of the first element in the returned tuple.</typeparam>
+		/// <typeparam name="T2">The type of the second element in the returned tuple.</typeparam>
+		/// <typeparam name="T3">The type of the third element in the returned tuple.</typeparam>
+		/// <param name="sql">The SQL query to execute. Should return multiple result sets.</param>
+		/// <param name="parameters">An object containing the parameters to be passed to the SQL query, or <see langword="null"/> if no parameters are required.</param>
+		/// <param name="keys">The keys used to identify the resource for the <see cref="NotFoundException"/>.</param>
+		/// <param name="mapper">An async function that reads from the <see cref="IMultipleResult"/> and returns the tuple value.</param>
+		/// <param name="transaction">An optional transaction within which the command executes.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task representing the asynchronous operation. The result contains a <see cref="Result{T}"/> object with the
+		/// tuple value, or a NotFound result if the mapper returns null.</returns>
+		public async Task<Result<(T1, T2, T3)>> MultipleGetAsync<T1, T2, T3>(
+			string sql,
+			object? parameters,
+			object[] keys,
+			Func<IMultipleResult, Task<(T1, T2, T3)?>> mapper,
+			IDbTransaction? transaction = null,
+			CancellationToken cancellationToken = default) {
+
+			IMultipleResult reader;
+			try {
+				reader = await conn
+					.QueryMultipleAsync(sql, parameters, transaction, cancellationToken)
+					.ConfigureAwait(false);
+			} catch (Exception ex) {
+				return ex.ToResult<(T1, T2, T3)>();
+			}
+
+			await using (reader) {
+				(T1, T2, T3)? result;
+				try {
+					result = await mapper(reader).ConfigureAwait(false);
+				} catch (Exception ex) {
+					return ex.ToResult<(T1, T2, T3)>();
+				}
+
+				return result is null
+					? Result.NotFound<(T1, T2, T3)>(keys)
+					: Result<(T1, T2, T3)>.Success(result.Value);
+			}
+		}
+
 		#endregion
 
 		#region MULTIPLE GET OPTIONAL
@@ -2535,6 +2877,132 @@ public static class SqlConnectionExtensions {
 				}
 
 				return Optional.From(result);
+			}
+		}
+
+		/// <summary>
+		/// Executes a query returning multiple result sets and processes them using the provided mapper.
+		/// Returns an <see cref="Optional{T}"/> that is empty if the mapper returns null.
+		/// </summary>
+		/// <typeparam name="T1">The type of the first element in the returned tuple.</typeparam>
+		/// <typeparam name="T2">The type of the second element in the returned tuple.</typeparam>
+		/// <param name="sql">The SQL query to execute. Should return multiple result sets.</param>
+		/// <param name="mapper">An async function that reads from the <see cref="IMultipleResult"/> and returns the tuple value, or null.</param>
+		/// <param name="transaction">An optional transaction within which the command executes.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task representing the asynchronous operation. The result contains a <see cref="Result{T}"/>
+		/// with an <see cref="Optional{T}"/> that is empty if the mapper returns null, or contains the tuple otherwise.</returns>
+		public Task<Result<Optional<(T1, T2)>>> MultipleGetOptionalAsync<T1, T2>(
+			string sql,
+			Func<IMultipleResult, Task<(T1, T2)?>> mapper,
+			IDbTransaction? transaction = null,
+			CancellationToken cancellationToken = default)
+			=> conn.MultipleGetOptionalAsync(sql, null, mapper, transaction, cancellationToken);
+
+		/// <summary>
+		/// Executes a query returning multiple result sets and processes them using the provided mapper.
+		/// Returns an <see cref="Optional{T}"/> that is empty if the mapper returns null.
+		/// </summary>
+		/// <typeparam name="T1">The type of the first element in the returned tuple.</typeparam>
+		/// <typeparam name="T2">The type of the second element in the returned tuple.</typeparam>
+		/// <param name="sql">The SQL query to execute. Should return multiple result sets.</param>
+		/// <param name="parameters">An object containing the parameters to be passed to the SQL query, or <see langword="null"/> if no parameters are required.</param>
+		/// <param name="mapper">An async function that reads from the <see cref="IMultipleResult"/> and returns the tuple value, or null.</param>
+		/// <param name="transaction">An optional transaction within which the command executes.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task representing the asynchronous operation. The result contains a <see cref="Result{T}"/>
+		/// with an <see cref="Optional{T}"/> that is empty if the mapper returns null, or contains the tuple otherwise.</returns>
+		public async Task<Result<Optional<(T1, T2)>>> MultipleGetOptionalAsync<T1, T2>(
+			string sql,
+			object? parameters,
+			Func<IMultipleResult, Task<(T1, T2)?>> mapper,
+			IDbTransaction? transaction = null,
+			CancellationToken cancellationToken = default) {
+
+			IMultipleResult reader;
+			try {
+				reader = await conn
+					.QueryMultipleAsync(sql, parameters, transaction, cancellationToken)
+					.ConfigureAwait(false);
+			} catch (Exception ex) {
+				return ex.ToResult<Optional<(T1, T2)>>();
+			}
+
+			await using (reader) {
+				(T1, T2)? result;
+				try {
+					result = await mapper(reader).ConfigureAwait(false);
+				} catch (Exception ex) {
+					return ex.ToResult<Optional<(T1, T2)>>();
+				}
+
+				return result.HasValue
+					? Optional.From<(T1, T2)>(result.Value)
+					: default;
+			}
+		}
+
+		/// <summary>
+		/// Executes a query returning multiple result sets and processes them using the provided mapper.
+		/// Returns an <see cref="Optional{T}"/> that is empty if the mapper returns null.
+		/// </summary>
+		/// <typeparam name="T1">The type of the first element in the returned tuple.</typeparam>
+		/// <typeparam name="T2">The type of the second element in the returned tuple.</typeparam>
+		/// <typeparam name="T3">The type of the third element in the returned tuple.</typeparam>
+		/// <param name="sql">The SQL query to execute. Should return multiple result sets.</param>
+		/// <param name="mapper">An async function that reads from the <see cref="IMultipleResult"/> and returns the tuple value, or null.</param>
+		/// <param name="transaction">An optional transaction within which the command executes.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task representing the asynchronous operation. The result contains a <see cref="Result{T}"/>
+		/// with an <see cref="Optional{T}"/> that is empty if the mapper returns null, or contains the tuple otherwise.</returns>
+		public Task<Result<Optional<(T1, T2, T3)>>> MultipleGetOptionalAsync<T1, T2, T3>(
+			string sql,
+			Func<IMultipleResult, Task<(T1, T2, T3)?>> mapper,
+			IDbTransaction? transaction = null,
+			CancellationToken cancellationToken = default)
+			=> conn.MultipleGetOptionalAsync(sql, null, mapper, transaction, cancellationToken);
+
+		/// <summary>
+		/// Executes a query returning multiple result sets and processes them using the provided mapper.
+		/// Returns an <see cref="Optional{T}"/> that is empty if the mapper returns null.
+		/// </summary>
+		/// <typeparam name="T1">The type of the first element in the returned tuple.</typeparam>
+		/// <typeparam name="T2">The type of the second element in the returned tuple.</typeparam>
+		/// <typeparam name="T3">The type of the third element in the returned tuple.</typeparam>
+		/// <param name="sql">The SQL query to execute. Should return multiple result sets.</param>
+		/// <param name="parameters">An object containing the parameters to be passed to the SQL query, or <see langword="null"/> if no parameters are required.</param>
+		/// <param name="mapper">An async function that reads from the <see cref="IMultipleResult"/> and returns the tuple value, or null.</param>
+		/// <param name="transaction">An optional transaction within which the command executes.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task representing the asynchronous operation. The result contains a <see cref="Result{T}"/>
+		/// with an <see cref="Optional{T}"/> that is empty if the mapper returns null, or contains the tuple otherwise.</returns>
+		public async Task<Result<Optional<(T1, T2, T3)>>> MultipleGetOptionalAsync<T1, T2, T3>(
+			string sql,
+			object? parameters,
+			Func<IMultipleResult, Task<(T1, T2, T3)?>> mapper,
+			IDbTransaction? transaction = null,
+			CancellationToken cancellationToken = default) {
+
+			IMultipleResult reader;
+			try {
+				reader = await conn
+					.QueryMultipleAsync(sql, parameters, transaction, cancellationToken)
+					.ConfigureAwait(false);
+			} catch (Exception ex) {
+				return ex.ToResult<Optional<(T1, T2, T3)>>();
+			}
+
+			await using (reader) {
+				(T1, T2, T3)? result;
+				try {
+					result = await mapper(reader).ConfigureAwait(false);
+				} catch (Exception ex) {
+					return ex.ToResult<Optional<(T1, T2, T3)>>();
+				}
+
+				return result.HasValue
+					? Optional.From<(T1, T2, T3)>(result.Value)
+					: default;
 			}
 		}
 

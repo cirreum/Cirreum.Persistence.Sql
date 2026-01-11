@@ -1,6 +1,5 @@
 ﻿namespace Cirreum.Persistence;
 
-using Cirreum.Exceptions;
 using System.Runtime.CompilerServices;
 
 /// <summary>
@@ -1379,6 +1378,76 @@ public readonly struct DbResult(DbContext context, Task<Result> resultTask) {
 
 	#endregion
 
+	#region Then GetPaged
+
+	/// <summary>
+	/// Chains a GetPaged operation after a successful result.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// The SQL should contain two statements: first a <c>SELECT COUNT(*)</c> query, then a data query with an
+	/// <c>ORDER BY</c> clause. If the data query does not already contain an <c>OFFSET</c> clause, one will be
+	/// appended automatically.
+	/// </para>
+	/// <para>
+	/// This method automatically injects <c>@PageSize</c> and <c>@Offset</c> parameters.
+	/// The parameters object must include <c>PageSize</c> and <c>Page</c> properties.
+	/// </para>
+	/// </remarks>
+	/// <typeparam name="TResult">The type of the elements to be returned.</typeparam>
+	/// <param name="sql">The SQL batch to execute.</param>
+	/// <param name="parameters">An object containing the parameters including PageSize and Page properties.</param>
+	public DbResult<PagedResult<TResult>> ThenGetPagedAsync<TResult>(string sql, object parameters)
+		=> new(context, this.ThenGetPagedAsyncCore<TResult>(sql, parameters));
+
+	/// <summary>
+	/// Chains a GetPaged operation with mapping after a successful result.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// The SQL should contain two statements: first a <c>SELECT COUNT(*)</c> query, then a data query with an
+	/// <c>ORDER BY</c> clause. If the data query does not already contain an <c>OFFSET</c> clause, one will be
+	/// appended automatically.
+	/// </para>
+	/// <para>
+	/// This method automatically injects <c>@PageSize</c> and <c>@Offset</c> parameters.
+	/// The parameters object must include <c>PageSize</c> and <c>Page</c> properties.
+	/// </para>
+	/// </remarks>
+	/// <typeparam name="TData">The type of the elements returned by the SQL query.</typeparam>
+	/// <typeparam name="TModel">The type of the elements in the final paged result.</typeparam>
+	/// <param name="sql">The SQL batch to execute.</param>
+	/// <param name="parameters">An object containing the parameters including PageSize and Page properties.</param>
+	/// <param name="mapper">A function to transform each data item to the domain model.</param>
+	public DbResult<PagedResult<TModel>> ThenGetPagedAsync<TData, TModel>(string sql, object parameters, Func<TData, TModel> mapper)
+		=> new(context, this.ThenGetPagedAsyncCore<TData, TModel>(sql, parameters, mapper));
+
+	private async Task<Result<PagedResult<TResult>>> ThenGetPagedAsyncCore<TResult>(string sql, object parameters) {
+		var result = await resultTask.ConfigureAwait(false);
+		if (result.IsFailure) {
+			return result.Error;
+		}
+
+		return await context
+			.GetPagedAsync<TResult>(sql, parameters)
+			.Result
+			.ConfigureAwait(false);
+	}
+
+	private async Task<Result<PagedResult<TModel>>> ThenGetPagedAsyncCore<TData, TModel>(string sql, object parameters, Func<TData, TModel> mapper) {
+		var result = await resultTask.ConfigureAwait(false);
+		if (result.IsFailure) {
+			return result.Error;
+		}
+
+		return await context
+			.GetPagedAsync<TData, TModel>(sql, parameters, mapper)
+			.Result
+			.ConfigureAwait(false);
+	}
+
+	#endregion
+
 	//==================== THEN GET/QUERY MULTIPLE ==================
 	//===============================================================
 
@@ -1389,7 +1458,7 @@ public readonly struct DbResult(DbContext context, Task<Result> resultTask) {
 	/// </summary>
 	/// <typeparam name="TResult">The type of the object to be returned.</typeparam>
 	/// <param name="sql">The SQL query to execute.</param>
-	/// <param name="keys">The keys used to identify the resource for the <see cref="Cirreum.Exceptions.NotFoundException"/>.</param>
+	/// <param name="keys">The keys used to identify the resource for the <see cref="Exceptions.NotFoundException"/>.</param>
 	/// <param name="mapper">An async function that reads from the <see cref="IMultipleResult"/> and returns the mapped value.</param>
 	public DbResult<TResult> ThenMultipleGetAsync<TResult>(
 		string sql,
@@ -1403,7 +1472,7 @@ public readonly struct DbResult(DbContext context, Task<Result> resultTask) {
 	/// <typeparam name="TResult">The type of the object to be returned.</typeparam>
 	/// <param name="sql">The SQL query to execute.</param>
 	/// <param name="parameters">The parameters for the query.</param>
-	/// <param name="keys">The keys used to identify the resource for the <see cref="Cirreum.Exceptions.NotFoundException"/>.</param>
+	/// <param name="keys">The keys used to identify the resource for the <see cref="Exceptions.NotFoundException"/>.</param>
 	/// <param name="mapper">An async function that reads from the <see cref="IMultipleResult"/> and returns the mapped value.</param>
 	public DbResult<TResult> ThenMultipleGetAsync<TResult>(
 		string sql,
@@ -1437,7 +1506,7 @@ public readonly struct DbResult(DbContext context, Task<Result> resultTask) {
 	public DbResult<Optional<TResult>> ThenMultipleGetOptionalAsync<TResult>(
 		string sql,
 		Func<IMultipleResult, Task<TResult?>> mapper)
-		=> new(context, this.ThenMultipleGetOptionalAsyncCore<TResult>(sql, null, mapper));
+		=> new(context, this.ThenMultipleGetOptionalAsyncCore(sql, null, mapper));
 
 	/// <summary>
 	/// Chains a multiple-result optional GET operation with parameters after a successful result.
@@ -1450,7 +1519,7 @@ public readonly struct DbResult(DbContext context, Task<Result> resultTask) {
 		string sql,
 		object? parameters,
 		Func<IMultipleResult, Task<TResult?>> mapper)
-		=> new(context, this.ThenMultipleGetOptionalAsyncCore<TResult>(sql, parameters, mapper));
+		=> new(context, this.ThenMultipleGetOptionalAsyncCore(sql, parameters, mapper));
 
 	private async Task<Result<Optional<TResult>>> ThenMultipleGetOptionalAsyncCore<TResult>(
 		string sql,

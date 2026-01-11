@@ -6,7 +6,8 @@
       "Bash(dotnet build:*)",
       "Bash(dir:*)",
       "Bash(git diff:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(dotnet pack:*)"
     ]
   }
 }

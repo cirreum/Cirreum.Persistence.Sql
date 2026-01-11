@@ -2,7 +2,6 @@
 
 using System.Data;
 
-
 /// <summary>
 /// Provides a fluent interface for executing database operations within a given context,
 /// automatically flowing the current connection, optional transaction, and cancellation
@@ -1335,6 +1334,114 @@ public readonly struct DbContext(
 		int page,
 		Func<TData, TModel> mapper)
 		=> new(this, connection.QueryPagedAsync(sql, parameters, totalCount, pageSize, page, mapper, transaction, cancellationToken));
+
+	#endregion
+
+	#region GetPaged
+
+	/// <summary>
+	/// Executes a SQL batch containing a count query and a data query, returning a paginated result.
+	/// Returns a <see cref="DbResult{T}"/> for fluent chaining within transactions.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// The SQL should contain two statements: first a <c>SELECT COUNT(*)</c> query, then a data query with an
+	/// <c>ORDER BY</c> clause. If the data query does not already contain an <c>OFFSET</c> clause, one will be
+	/// appended automatically.
+	/// </para>
+	/// <para>
+	/// This method automatically injects <c>@PageSize</c> and <c>@Offset</c> parameters.
+	/// </para>
+	/// </remarks>
+	/// <typeparam name="T">The type of the elements to be returned.</typeparam>
+	/// <param name="sql">The SQL batch to execute. Should contain a COUNT query followed by a data query with ORDER BY.</param>
+	/// <param name="pageSize">The number of items per page.</param>
+	/// <param name="page">The current page number (1-based).</param>
+	/// <returns>A <see cref="DbResult{T}"/> that can be chained with other database operations.</returns>
+	public DbResult<PagedResult<T>> GetPagedAsync<T>(
+		string sql,
+		int pageSize,
+		int page)
+		=> new(this, connection.GetPagedAsync<T>(sql, pageSize, page, transaction, cancellationToken));
+
+	/// <summary>
+	/// Executes a SQL batch containing a count query and a data query, returning a paginated result.
+	/// Returns a <see cref="DbResult{T}"/> for fluent chaining within transactions.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// The SQL should contain two statements: first a <c>SELECT COUNT(*)</c> query, then a data query with an
+	/// <c>ORDER BY</c> clause. If the data query does not already contain an <c>OFFSET</c> clause, one will be
+	/// appended automatically.
+	/// </para>
+	/// <para>
+	/// The <paramref name="parameters"/> object must include <c>PageSize</c> and <c>Page</c> properties (both <c>int</c>).
+	/// The <c>@Offset</c> parameter is calculated automatically from these values.
+	/// </para>
+	/// </remarks>
+	/// <typeparam name="T">The type of the elements to be returned.</typeparam>
+	/// <param name="sql">The SQL batch to execute. Should contain a COUNT query followed by a data query with ORDER BY.</param>
+	/// <param name="parameters">An object containing the query parameters, including <c>PageSize</c> and <c>Page</c> properties.</param>
+	/// <returns>A <see cref="DbResult{T}"/> that can be chained with other database operations.</returns>
+	public DbResult<PagedResult<T>> GetPagedAsync<T>(
+		string sql,
+		object parameters)
+		=> new(this, connection.GetPagedAsync<T>(sql, parameters, transaction, cancellationToken));
+
+	/// <summary>
+	/// Executes a SQL batch containing a count query and a data query, returning a paginated result with mapped items.
+	/// Returns a <see cref="DbResult{T}"/> for fluent chaining within transactions.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// The SQL should contain two statements: first a <c>SELECT COUNT(*)</c> query, then a data query with an
+	/// <c>ORDER BY</c> clause. If the data query does not already contain an <c>OFFSET</c> clause, one will be
+	/// appended automatically.
+	/// </para>
+	/// <para>
+	/// This method automatically injects <c>@PageSize</c> and <c>@Offset</c> parameters.
+	/// </para>
+	/// </remarks>
+	/// <typeparam name="TData">The type of the elements returned by the SQL query.</typeparam>
+	/// <typeparam name="TModel">The type of the elements in the final paged result.</typeparam>
+	/// <param name="sql">The SQL batch to execute. Should contain a COUNT query followed by a data query with ORDER BY.</param>
+	/// <param name="pageSize">The number of items per page.</param>
+	/// <param name="page">The current page number (1-based).</param>
+	/// <param name="mapper">A function to transform each data item to the domain model.</param>
+	/// <returns>A <see cref="DbResult{T}"/> that can be chained with other database operations.</returns>
+	public DbResult<PagedResult<TModel>> GetPagedAsync<TData, TModel>(
+		string sql,
+		int pageSize,
+		int page,
+		Func<TData, TModel> mapper)
+		=> new(this, connection.GetPagedAsync(sql, pageSize, page, mapper, transaction, cancellationToken));
+
+	/// <summary>
+	/// Executes a SQL batch containing a count query and a data query, returning a paginated result with mapped items.
+	/// Returns a <see cref="DbResult{T}"/> for fluent chaining within transactions.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// The SQL should contain two statements: first a <c>SELECT COUNT(*)</c> query, then a data query with an
+	/// <c>ORDER BY</c> clause. If the data query does not already contain an <c>OFFSET</c> clause, one will be
+	/// appended automatically.
+	/// </para>
+	/// <para>
+	/// The <paramref name="parameters"/> object must include <c>PageSize</c> and <c>Page</c> properties (both <c>int</c>).
+	/// The <c>@Offset</c> parameter is calculated automatically from these values.
+	/// </para>
+	/// </remarks>
+	/// <typeparam name="TData">The type of the elements returned by the SQL query.</typeparam>
+	/// <typeparam name="TModel">The type of the elements in the final paged result.</typeparam>
+	/// <param name="sql">The SQL batch to execute. Should contain a COUNT query followed by a data query with ORDER BY.</param>
+	/// <param name="parameters">An object containing the query parameters, including <c>PageSize</c> and <c>Page</c> properties.</param>
+	/// <param name="mapper">A function to transform each data item to the domain model.</param>
+	/// <returns>A <see cref="DbResult{T}"/> that can be chained with other database operations.</returns>
+	public DbResult<PagedResult<TModel>> GetPagedAsync<TData, TModel>(
+		string sql,
+		object parameters,
+		Func<TData, TModel> mapper)
+		=> new(this, connection.GetPagedAsync(sql, parameters, mapper, transaction, cancellationToken));
 
 	#endregion
 

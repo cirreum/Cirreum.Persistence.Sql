@@ -817,6 +817,147 @@ public static class SqlConnectionFactoryExtensions {
 
 		#endregion
 
+		#region GET PAGED
+
+		/// <summary>
+		/// Executes a SQL batch containing a count query and a data query, returning a paginated result.
+		/// </summary>
+		/// <remarks>
+		/// <para>
+		/// The SQL should contain two statements: first a <c>SELECT COUNT(*)</c> query, then a data query with an
+		/// <c>ORDER BY</c> clause. If the data query does not already contain an <c>OFFSET</c> clause, one will be
+		/// appended automatically.
+		/// </para>
+		/// <para>
+		/// This method automatically injects <c>@PageSize</c> and <c>@Offset</c> parameters. Your SQL can reference
+		/// these directly, or omit the OFFSET clause entirely to have it appended automatically.
+		/// </para>
+		/// <example>
+		/// <code>
+		/// // SQL without OFFSET (will be appended automatically):
+		/// var sql = @"
+		///     SELECT COUNT(*) FROM Orders WHERE CustomerId = @CustomerId;
+		///     SELECT * FROM Orders WHERE CustomerId = @CustomerId ORDER BY CreatedAt DESC";
+		///
+		/// // SQL with explicit OFFSET:
+		/// var sql = @"
+		///     SELECT COUNT(*) FROM Orders WHERE CustomerId = @CustomerId;
+		///     SELECT * FROM Orders WHERE CustomerId = @CustomerId
+		///     ORDER BY CreatedAt DESC
+		///     OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+		/// </code>
+		/// </example>
+		/// </remarks>
+		/// <typeparam name="T">The type of the elements to be returned in the paged result.</typeparam>
+		/// <param name="sql">The SQL batch to execute. Should contain a COUNT query followed by a data query with ORDER BY.</param>
+		/// <param name="pageSize">The number of items per page.</param>
+		/// <param name="page">The current page number (1-based).</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task that represents the asynchronous operation. The task result contains a <see cref="Result{T}"/>
+		/// wrapping a <see cref="PagedResult{T}"/> with the queried items and pagination metadata.</returns>
+		public async Task<Result<PagedResult<T>>> GetPagedAsync<T>(
+			string sql,
+			int pageSize,
+			int page,
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.GetPagedAsync<T>(sql, pageSize, page, null, cancellationToken);
+		}
+
+		/// <summary>
+		/// Executes a SQL batch containing a count query and a data query, returning a paginated result.
+		/// </summary>
+		/// <remarks>
+		/// <para>
+		/// The SQL should contain two statements: first a <c>SELECT COUNT(*)</c> query, then a data query with an
+		/// <c>ORDER BY</c> clause. If the data query does not already contain an <c>OFFSET</c> clause, one will be
+		/// appended automatically.
+		/// </para>
+		/// <para>
+		/// The <paramref name="parameters"/> object must include <c>PageSize</c> and <c>Page</c> properties (both <c>int</c>).
+		/// The <c>@Offset</c> parameter is calculated automatically from these values.
+		/// </para>
+		/// </remarks>
+		/// <typeparam name="T">The type of the elements to be returned in the paged result.</typeparam>
+		/// <param name="sql">The SQL batch to execute. Should contain a COUNT query followed by a data query with ORDER BY.</param>
+		/// <param name="parameters">An object containing the query parameters, including <c>PageSize</c> and <c>Page</c> properties.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task that represents the asynchronous operation. The task result contains a <see cref="Result{T}"/>
+		/// wrapping a <see cref="PagedResult{T}"/> with the queried items and pagination metadata.</returns>
+		public async Task<Result<PagedResult<T>>> GetPagedAsync<T>(
+			string sql,
+			object parameters,
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.GetPagedAsync<T>(sql, parameters, null, cancellationToken);
+		}
+
+		/// <summary>
+		/// Executes a SQL batch containing a count query and a data query, returning a paginated result with mapped items.
+		/// </summary>
+		/// <remarks>
+		/// <para>
+		/// The SQL should contain two statements: first a <c>SELECT COUNT(*)</c> query, then a data query with an
+		/// <c>ORDER BY</c> clause. If the data query does not already contain an <c>OFFSET</c> clause, one will be
+		/// appended automatically.
+		/// </para>
+		/// <para>
+		/// This method automatically injects <c>@PageSize</c> and <c>@Offset</c> parameters. Your SQL can reference
+		/// these directly, or omit the OFFSET clause entirely to have it appended automatically.
+		/// </para>
+		/// </remarks>
+		/// <typeparam name="TData">The type of the elements returned by the SQL query (data layer).</typeparam>
+		/// <typeparam name="TModel">The type of the elements in the final paged result (domain layer).</typeparam>
+		/// <param name="sql">The SQL batch to execute. Should contain a COUNT query followed by a data query with ORDER BY.</param>
+		/// <param name="pageSize">The number of items per page.</param>
+		/// <param name="page">The current page number (1-based).</param>
+		/// <param name="mapper">A function to transform each data item to the domain model.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task that represents the asynchronous operation. The task result contains a <see cref="Result{T}"/>
+		/// wrapping a <see cref="PagedResult{T}"/> with the mapped items and pagination metadata.</returns>
+		public async Task<Result<PagedResult<TModel>>> GetPagedAsync<TData, TModel>(
+			string sql,
+			int pageSize,
+			int page,
+			Func<TData, TModel> mapper,
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.GetPagedAsync(sql, pageSize, page, mapper, null, cancellationToken);
+		}
+
+		/// <summary>
+		/// Executes a SQL batch containing a count query and a data query, returning a paginated result with mapped items.
+		/// </summary>
+		/// <remarks>
+		/// <para>
+		/// The SQL should contain two statements: first a <c>SELECT COUNT(*)</c> query, then a data query with an
+		/// <c>ORDER BY</c> clause. If the data query does not already contain an <c>OFFSET</c> clause, one will be
+		/// appended automatically.
+		/// </para>
+		/// <para>
+		/// The <paramref name="parameters"/> object must include <c>PageSize</c> and <c>Page</c> properties (both <c>int</c>).
+		/// The <c>@Offset</c> parameter is calculated automatically from these values.
+		/// </para>
+		/// </remarks>
+		/// <typeparam name="TData">The type of the elements returned by the SQL query (data layer).</typeparam>
+		/// <typeparam name="TModel">The type of the elements in the final paged result (domain layer).</typeparam>
+		/// <param name="sql">The SQL batch to execute. Should contain a COUNT query followed by a data query with ORDER BY.</param>
+		/// <param name="parameters">An object containing the query parameters, including <c>PageSize</c> and <c>Page</c> properties.</param>
+		/// <param name="mapper">A function to transform each data item to the domain model.</param>
+		/// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+		/// <returns>A task that represents the asynchronous operation. The task result contains a <see cref="Result{T}"/>
+		/// wrapping a <see cref="PagedResult{T}"/> with the mapped items and pagination metadata.</returns>
+		public async Task<Result<PagedResult<TModel>>> GetPagedAsync<TData, TModel>(
+			string sql,
+			object parameters,
+			Func<TData, TModel> mapper,
+			CancellationToken cancellationToken = default) {
+			await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+			return await connection.GetPagedAsync(sql, parameters, mapper, null, cancellationToken);
+		}
+
+		#endregion
+
 		#region QUERY CURSOR
 
 		/// <summary>

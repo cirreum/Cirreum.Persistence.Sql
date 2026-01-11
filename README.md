@@ -231,6 +231,90 @@ public async Task<Result<OrderWithItems>> GetOrderWithItemsAsync(Guid orderId, C
 
 Also available: `MultipleGetOptionalAsync` (returns `Optional<T>` when mapper returns null) and `MultipleQueryAnyAsync` (for queries returning lists).
 
+### Tuple Return Types
+
+When your mapper needs to return multiple distinct values from multiple result sets, use the tuple-returning overloads. These provide type-safe access to each result without requiring a custom wrapper type:
+
+```csharp
+// MultipleGetAsync<T1, T2> - Returns Result<(T1, T2)>, NotFound if mapper returns null
+public async Task<Result<(UserDto, IReadOnlyList<OrderDto>)>> GetUserWithOrdersAsync(
+    Guid userId, CancellationToken ct)
+{
+    return await db.MultipleGetAsync<UserDto, IReadOnlyList<OrderDto>>(
+        """
+        SELECT * FROM Users WHERE Id = @Id;
+        SELECT * FROM Orders WHERE UserId = @Id;
+        """,
+        new { Id = userId },
+        keys: [userId],
+        async reader => {
+            var user = await reader.ReadSingleOrDefaultAsync<UserDto>();
+            if (user is null) return null;
+            var orders = (await reader.ReadAsync<OrderDto>()).ToList();
+            return (user, (IReadOnlyList<OrderDto>)orders);
+        },
+        ct);
+}
+
+// Access results via tuple
+var result = await GetUserWithOrdersAsync(userId, ct);
+if (result.IsSuccess) {
+    var (user, orders) = result.Value;
+    Console.WriteLine($"User: {user.Name}, Orders: {orders.Count}");
+}
+```
+
+Three-element tuples are also supported:
+
+```csharp
+// MultipleGetAsync<T1, T2, T3> - Returns Result<(T1, T2, T3)>
+public async Task<Result<(UserDto, IReadOnlyList<OrderDto>, int)>> GetUserDashboardAsync(
+    Guid userId, CancellationToken ct)
+{
+    return await db.MultipleGetAsync<UserDto, IReadOnlyList<OrderDto>, int>(
+        """
+        SELECT * FROM Users WHERE Id = @Id;
+        SELECT * FROM Orders WHERE UserId = @Id;
+        SELECT COUNT(*) FROM Orders WHERE UserId = @Id;
+        """,
+        new { Id = userId },
+        keys: [userId],
+        async reader => {
+            var user = await reader.ReadSingleOrDefaultAsync<UserDto>();
+            if (user is null) return null;
+            var orders = (await reader.ReadAsync<OrderDto>()).ToList();
+            var totalCount = await reader.ReadSingleOrDefaultAsync<int>();
+            return ((UserDto, IReadOnlyList<OrderDto>, int)?)(user, orders, totalCount);
+        },
+        ct);
+}
+```
+
+For queries where the mapper always returns a value (no "not found" condition), use `MultipleQueryAnyAsync`:
+
+```csharp
+// MultipleQueryAnyAsync<T> - Returns Result<T>, mapper always returns non-null
+public async Task<Result<OrderStats>> GetOrderStatsAsync(CancellationToken ct)
+{
+    return await db.MultipleQueryAnyAsync<OrderStats>(
+        """
+        SELECT COUNT(*) FROM Orders;
+        SELECT * FROM Orders WHERE Status = 'Pending';
+        """,
+        async reader => {
+            var totalCount = await reader.ReadSingleOrDefaultAsync<int>();
+            var pendingOrders = (await reader.ReadAsync<OrderDto>()).ToList();
+            return new OrderStats(totalCount, pendingOrders);
+        },
+        ct);
+}
+```
+
+| Method | Tuple Variants | Mapper Returns | On Null |
+|--------|---------------|----------------|---------|
+| `MultipleGetAsync` | `<T1, T2>`, `<T1, T2, T3>` | `(T1, T2)?` | `NotFound` |
+| `MultipleGetOptionalAsync` | `<T1, T2>`, `<T1, T2, T3>` | `(T1, T2)?` | `Optional.Empty` (success) |
+
 ## Pagination
 
 This library provides query extension methods that return pagination result types from [Cirreum.Result](https://github.com/cirreum/Cirreum.Result). The result types (`PagedResult<T>`, `CursorResult<T>`, `SliceResult<T>`, and `Cursor`) are defined in the base layer, while this library provides the SQL query extensions to populate them.
@@ -238,22 +322,69 @@ This library provides query extension methods that return pagination result type
 ### Offset Pagination (PagedResult)
 
 Best for smaller datasets with "Page X of Y" UI requirements.
+
+**Single-batch approach (recommended)** - Execute count and data queries in one roundtrip:
 ```csharp
 public async Task<Result<PagedResult<Order>>> GetOrdersPagedAsync(
-    Guid customerId, int pageSize, int pageNumber, CancellationToken ct)
+    Guid customerId, int pageSize, int page, CancellationToken ct)
 {
-    var offset = (pageNumber - 1) * pageSize;
-
-    // Query 1: Get total count
-    var totalCountResult = await db.GetScalarAsync<int>(
-        "SELECT COUNT(*) FROM Orders WHERE CustomerId = @CustomerId",
-        new { CustomerId = customerId },
+    // Single batch: COUNT query followed by data query
+    // The OFFSET clause is auto-appended based on database provider if not present
+    return await db.GetPagedAsync<Order>(
+        """
+        SELECT COUNT(*) FROM Orders WHERE CustomerId = @CustomerId;
+        SELECT * FROM Orders WHERE CustomerId = @CustomerId ORDER BY CreatedAt DESC
+        """,
+        new { CustomerId = customerId, PageSize = pageSize, Page = page },
         ct);
+}
 
-    if (totalCountResult.IsFailure)
-        return totalCountResult.Error;
+// Or with explicit pagination parameters
+public async Task<Result<PagedResult<Order>>> GetOrdersPagedAsync(
+    Guid customerId, int pageSize, int page, CancellationToken ct)
+{
+    return await db.GetPagedAsync<Order>(
+        """
+        SELECT COUNT(*) FROM Orders WHERE CustomerId = @CustomerId;
+        SELECT * FROM Orders WHERE CustomerId = @CustomerId ORDER BY CreatedAt DESC
+        """,
+        pageSize: pageSize,
+        page: page,
+        ct);
+}
+```
 
-    // Query 2: Get page data (syntax varies by database)
+The `GetPagedAsync` method:
+- Executes both queries in a single batch for efficiency
+- Auto-injects `@PageSize` and `@Offset` parameters (calculated from `Page`)
+- Auto-appends the appropriate OFFSET clause if not present in SQL:
+  - **SQL Server**: `OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY`
+  - **SQLite/PostgreSQL/MySQL**: `LIMIT @PageSize OFFSET @Offset`
+- Returns `PagedResult<T>` with items, total count, page size, and total pages
+
+**With data transformation:**
+```csharp
+public async Task<Result<PagedResult<OrderSummary>>> GetOrderSummariesAsync(
+    Guid customerId, int pageSize, int page, CancellationToken ct)
+{
+    return await db.GetPagedAsync<OrderDto, OrderSummary>(
+        """
+        SELECT COUNT(*) FROM Orders WHERE CustomerId = @CustomerId;
+        SELECT * FROM Orders WHERE CustomerId = @CustomerId ORDER BY CreatedAt DESC
+        """,
+        new { CustomerId = customerId, PageSize = pageSize, Page = page },
+        dto => new OrderSummary(dto.Id, dto.Total),
+        ct);
+}
+```
+
+**Legacy approach** - When you already have the total count from elsewhere:
+```csharp
+public async Task<Result<PagedResult<Order>>> GetOrdersPagedAsync(
+    Guid customerId, int totalCount, int pageSize, int page, CancellationToken ct)
+{
+    var offset = (page - 1) * pageSize;
+
     return await db.QueryPagedAsync<Order>(
         """
         SELECT * FROM Orders
@@ -262,7 +393,7 @@ public async Task<Result<PagedResult<Order>>> GetOrdersPagedAsync(
         LIMIT @PageSize OFFSET @Offset
         """,
         new { CustomerId = customerId, Offset = offset, PageSize = pageSize },
-        totalCountResult.Value, pageSize, pageNumber, ct);
+        totalCount, pageSize, page, ct);
 }
 ```
 
@@ -657,7 +788,9 @@ public async Task<Result<OrderDto>> CreateOrderWithItemsAsync(
 - `QueryOptionalAsync<T>(...)` - Query optional record (returns first if multiple)
 - `GetScalarAsync<T>(...)` - Query scalar value
 - `QueryAnyAsync<T>(...)` - Query collection
-- `QueryPagedAsync<T>(...)` - Query with offset pagination
+- `GetPagedAsync<T>(...)` - Single-batch offset pagination (count + data)
+- `GetPagedAsync<TData, TModel>(...)` - Single-batch pagination with mapper
+- `QueryPagedAsync<T>(...)` - Query with offset pagination (when you have count)
 - `QueryCursorAsync<T, TColumn>(...)` - Query with cursor pagination
 - `QuerySliceAsync<T>(...)` - Query slice with "has more" indicator
 - `MultipleGetAsync<T>(...)` - Query multiple result sets (fails if not found)
@@ -702,6 +835,8 @@ public async Task<Result<OrderDto>> CreateOrderWithItemsAsync(
 - `ThenGetOptionalAsync<TResult>(...)` - Query optional record (returns `Optional<TResult>`)
 - `ThenGetScalarAsync<TResult>(...)` - Query scalar value
 - `ThenQueryAnyAsync<TResult>(...)` - Query collection
+- `ThenGetPagedAsync<TResult>(...)` - Single-batch offset pagination (count + data)
+- `ThenGetPagedAsync<TData, TModel>(...)` - Single-batch pagination with mapper
 - `ThenMultipleGetAsync<TResult>(...)` - Query multiple result sets
 - `ThenMultipleGetOptionalAsync<TResult>(...)` - Query multiple result sets (optional)
 - `ThenMultipleQueryAnyAsync<TResult>(...)` - Query multiple result sets (collection)
@@ -744,6 +879,8 @@ public async Task<Result<OrderDto>> CreateOrderWithItemsAsync(
 - `ThenGetOptionalAsync<TResult>(...)` - Query optional record (returns `Optional<TResult>`)
 - `ThenGetScalarAsync<TResult>(...)` - Query scalar value
 - `ThenQueryAnyAsync<TResult>(...)` - Query collection
+- `ThenGetPagedAsync<TResult>(...)` - Single-batch offset pagination (count + data)
+- `ThenGetPagedAsync<TData, TModel>(...)` - Single-batch pagination with mapper
 - `ThenMultipleGetAsync<TResult>(...)` - Query multiple result sets
 - `ThenMultipleGetOptionalAsync<TResult>(...)` - Query multiple result sets (optional)
 - `ThenMultipleQueryAnyAsync<TResult>(...)` - Query multiple result sets (collection)

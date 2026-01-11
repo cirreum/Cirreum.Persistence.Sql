@@ -501,4 +501,295 @@ public sealed class QueryMultipleAsyncTests {
 	public TestContext TestContext { get; set; }
 
 	#endregion
+
+	#region MultipleGetAsync Tuple Overloads
+
+	[TestMethod]
+	public async Task MultipleGetAsync_T1T2_ReturnsValue_WhenMapperReturnsTuple() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+
+		var userId = Guid.NewGuid().ToString();
+		rawConn.Execute(
+			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId, Name = "John", Email = "john@test.com" });
+		rawConn.Execute(
+			"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
+			new { Id = Guid.NewGuid().ToString(), UserId = userId, Amount = 100.0 });
+		rawConn.Execute(
+			"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
+			new { Id = Guid.NewGuid().ToString(), UserId = userId, Amount = 200.0 });
+
+		// Act
+		var result = await conn.MultipleGetAsync<UserDto, IReadOnlyList<OrderDto>>(
+			"""
+			SELECT Id, Name, Email FROM Users WHERE Id = @Id;
+			SELECT Id, UserId, Amount FROM Orders WHERE UserId = @Id;
+			""",
+			new { Id = userId },
+			[userId],
+			async reader => {
+				var user = await reader.ReadSingleOrDefaultAsync<UserDto>();
+				if (user is null) {
+					return null;
+				}
+				var orders = (await reader.ReadAsync<OrderDto>()).ToList();
+				return (user, orders);
+			}, cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual("John", result.Value.Item1.Name);
+		Assert.HasCount(2, result.Value.Item2);
+		Assert.AreEqual(300.0, result.Value.Item2.Sum(o => o.Amount));
+	}
+
+	[TestMethod]
+	public async Task MultipleGetAsync_T1T2_ReturnsNotFound_WhenMapperReturnsNull() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+
+		var userId = Guid.NewGuid().ToString();
+
+		// Act
+		var result = await conn.MultipleGetAsync<UserDto, IReadOnlyList<OrderDto>>(
+			"""
+			SELECT Id, Name, Email FROM Users WHERE Id = @Id;
+			SELECT Id, UserId, Amount FROM Orders WHERE UserId = @Id;
+			""",
+			new { Id = userId },
+			[userId],
+			async reader => {
+				var user = await reader.ReadSingleOrDefaultAsync<UserDto>();
+				if (user is null) {
+					return null;
+				}
+				var orders = (await reader.ReadAsync<OrderDto>()).ToList();
+				return (user, orders);
+			}, cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsFailure);
+		Assert.IsInstanceOfType<NotFoundException>(result.Error);
+	}
+
+	[TestMethod]
+	public async Task MultipleGetAsync_T1T2T3_ReturnsValue_WhenMapperReturnsTuple() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+
+		var userId = Guid.NewGuid().ToString();
+		rawConn.Execute(
+			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId, Name = "John", Email = "john@test.com" });
+		rawConn.Execute(
+			"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
+			new { Id = Guid.NewGuid().ToString(), UserId = userId, Amount = 100.0 });
+
+		// Act
+		var result = await conn.MultipleGetAsync(
+			"""
+			SELECT Id, Name, Email FROM Users WHERE Id = @Id;
+			SELECT Id, UserId, Amount FROM Orders WHERE UserId = @Id;
+			SELECT COUNT(*) FROM Orders WHERE UserId = @Id;
+			""",
+			new { Id = userId },
+			[userId],
+			async reader => {
+				var user = await reader.ReadSingleOrDefaultAsync<UserDto>();
+				if (user is null) {
+					return null;
+				}
+				var orders = (await reader.ReadAsync<OrderDto>()).ToList();
+				var count = await reader.ReadSingleOrDefaultAsync<int>();
+				return ((UserDto, IReadOnlyList<OrderDto>, int)?)(user, orders, count);
+			}, cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual("John", result.Value.Item1.Name);
+		Assert.HasCount(1, result.Value.Item2);
+		Assert.AreEqual(1, result.Value.Item3);
+	}
+
+	[TestMethod]
+	public async Task MultipleGetAsync_T1T2_NoParameters_Works() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+
+		rawConn.Execute(
+			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = Guid.NewGuid().ToString(), Name = "User1", Email = "user1@test.com" });
+		rawConn.Execute(
+			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = Guid.NewGuid().ToString(), Name = "User2", Email = "user2@test.com" });
+
+		// Act
+		var result = await conn.MultipleGetAsync(
+			"SELECT COUNT(*) FROM Users; SELECT COUNT(*) FROM Orders;",
+			["all"],
+			async reader => {
+				var userCount = await reader.ReadSingleOrDefaultAsync<int>();
+				var orderCount = await reader.ReadSingleOrDefaultAsync<int>();
+				return ((int, int)?)(userCount, orderCount);
+			}, cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.AreEqual(2, result.Value.Item1);
+		Assert.AreEqual(0, result.Value.Item2);
+	}
+
+	#endregion
+
+	#region MultipleGetOptionalAsync Tuple Overloads
+
+	[TestMethod]
+	public async Task MultipleGetOptionalAsync_T1T2_ReturnsOptionalWithValue_WhenMapperReturnsTuple() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+
+		var userId = Guid.NewGuid().ToString();
+		rawConn.Execute(
+			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId, Name = "John", Email = "john@test.com" });
+		rawConn.Execute(
+			"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
+			new { Id = Guid.NewGuid().ToString(), UserId = userId, Amount = 100.0 });
+
+		// Act
+		var result = await conn.MultipleGetOptionalAsync<UserDto, IReadOnlyList<OrderDto>>(
+			"""
+			SELECT Id, Name, Email FROM Users WHERE Id = @Id;
+			SELECT Id, UserId, Amount FROM Orders WHERE UserId = @Id;
+			""",
+			new { Id = userId },
+			async reader => {
+				var user = await reader.ReadSingleOrDefaultAsync<UserDto>();
+				if (user is null) {
+					return null;
+				}
+
+				var orders = (await reader.ReadAsync<OrderDto>()).ToList();
+				return ((UserDto, IReadOnlyList<OrderDto>)?)(user, orders);
+			}, cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.IsTrue(result.Value.HasValue);
+		Assert.AreEqual("John", result.Value.Value.Item1.Name);
+		Assert.HasCount(1, result.Value.Value.Item2);
+	}
+
+	[TestMethod]
+	public async Task MultipleGetOptionalAsync_T1T2_ReturnsEmptyOptional_WhenMapperReturnsNull() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+
+		var userId = Guid.NewGuid().ToString();
+
+		// Act
+		var result = await conn.MultipleGetOptionalAsync<UserDto, IReadOnlyList<OrderDto>>(
+			"""
+			SELECT Id, Name, Email FROM Users WHERE Id = @Id;
+			SELECT Id, UserId, Amount FROM Orders WHERE UserId = @Id;
+			""",
+			new { Id = userId },
+			async reader => {
+				var user = await reader.ReadSingleOrDefaultAsync<UserDto>();
+				if (user is null) {
+					return null;
+				}
+
+				var orders = (await reader.ReadAsync<OrderDto>()).ToList();
+				return ((UserDto, IReadOnlyList<OrderDto>)?)(user, orders);
+			}, cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert - Success with empty Optional (NOT a failure like MultipleGetAsync)
+		Assert.IsTrue(result.IsSuccess);
+		Assert.IsFalse(result.Value.HasValue);
+	}
+
+	[TestMethod]
+	public async Task MultipleGetOptionalAsync_T1T2T3_ReturnsOptionalWithValue_WhenMapperReturnsTuple() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+
+		var userId = Guid.NewGuid().ToString();
+		rawConn.Execute(
+			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = userId, Name = "John", Email = "john@test.com" });
+		rawConn.Execute(
+			"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
+			new { Id = Guid.NewGuid().ToString(), UserId = userId, Amount = 100.0 });
+
+		// Act
+		var result = await conn.MultipleGetOptionalAsync<UserDto, IReadOnlyList<OrderDto>, int>(
+			"""
+			SELECT Id, Name, Email FROM Users WHERE Id = @Id;
+			SELECT Id, UserId, Amount FROM Orders WHERE UserId = @Id;
+			SELECT COUNT(*) FROM Orders WHERE UserId = @Id;
+			""",
+			new { Id = userId },
+			async reader => {
+				var user = await reader.ReadSingleOrDefaultAsync<UserDto>();
+				if (user is null) {
+					return null;
+				}
+
+				var orders = (await reader.ReadAsync<OrderDto>()).ToList();
+				var count = await reader.ReadSingleOrDefaultAsync<int>();
+				return ((UserDto, IReadOnlyList<OrderDto>, int)?)(user, orders, count);
+			}, cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.IsTrue(result.Value.HasValue);
+		Assert.AreEqual("John", result.Value.Value.Item1.Name);
+		Assert.HasCount(1, result.Value.Value.Item2);
+		Assert.AreEqual(1, result.Value.Value.Item3);
+	}
+
+	[TestMethod]
+	public async Task MultipleGetOptionalAsync_T1T2_NoParameters_Works() {
+		// Arrange
+		var (conn, rawConn) = CreateConnection();
+		await using var _ = conn;
+		CreateTestSchema(rawConn);
+
+		rawConn.Execute(
+			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
+			new { Id = Guid.NewGuid().ToString(), Name = "User1", Email = "user1@test.com" });
+
+		// Act
+		var result = await conn.MultipleGetOptionalAsync<int, int>(
+			"SELECT COUNT(*) FROM Users; SELECT COUNT(*) FROM Orders;",
+			async reader => {
+				var userCount = await reader.ReadSingleOrDefaultAsync<int>();
+				var orderCount = await reader.ReadSingleOrDefaultAsync<int>();
+				return ((int, int)?)(userCount, orderCount);
+			}, cancellationToken: this.TestContext.CancellationToken);
+
+		// Assert
+		Assert.IsTrue(result.IsSuccess);
+		Assert.IsTrue(result.Value.HasValue);
+		Assert.AreEqual(1, result.Value.Value.Item1);
+		Assert.AreEqual(0, result.Value.Value.Item2);
+	}
+
+	#endregion
 }
