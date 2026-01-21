@@ -11,8 +11,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Cirreum.Exceptions" Version="1.0.0" />
-		<PackageReference Include="Cirreum.Result" Version="1.0.10" />
+		<PackageReference Include="Cirreum.Exceptions" Version="1.0.1" />
+		<PackageReference Include="Cirreum.Result" Version="1.0.11" />
 	</ItemGroup>
 
 	<ItemGroup>
