@@ -7,7 +7,10 @@
       "Bash(dir:*)",
       "Bash(git diff:*)",
       "Bash(cat:*)",
-      "Bash(dotnet pack:*)"
+      "Bash(dotnet pack:*)",
+      "Bash(del \"C:\\\\Cirreum\\\\Common\\\\Cirreum.Persistence.Sql\\\\src\\\\Cirreum.Persistence.Sql\\\\Extensions\\\\ResultExtensions.cs\")",
+      "Bash(cmd /c del \"C:\\\\Cirreum\\\\Common\\\\Cirreum.Persistence.Sql\\\\src\\\\Cirreum.Persistence.Sql\\\\Extensions\\\\ResultExtensions.cs\")",
+      "Bash(powershell:*)"
     ]
   }
 }

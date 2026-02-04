@@ -61,7 +61,9 @@ public static class SqlConnectionExtensions {
 				parameters,
 				transaction: transaction,
 				cancellationToken);
-			return Result.FromLookup(result, key);
+			return result is not null
+				? Result.From(result)
+				: Result<T>.Fail(new NotFoundException(key));
 		}
 
 		/// <summary>
@@ -112,7 +114,7 @@ public static class SqlConnectionExtensions {
 				transaction,
 				cancellationToken);
 			if (result is null) {
-				return Result.NotFound<TModel>(key);
+				return Result<TModel>.Fail(new NotFoundException(key));
 			}
 			return mapper(result);
 		}
@@ -350,7 +352,9 @@ public static class SqlConnectionExtensions {
 				parameters,
 				transaction: transaction,
 				cancellationToken: cancellationToken);
-			return Result.FromNullable(result, new InvalidOperationException("Scalar query returned null. Use ISNULL/COALESCE in SQL."));
+			return result is not null
+				? Result.From(result)
+				: Result<T>.Fail(new InvalidOperationException("Scalar query returned null. Use ISNULL/COALESCE in SQL."));
 		}
 
 		/// <summary>
@@ -428,7 +432,10 @@ public static class SqlConnectionExtensions {
 				parameters,
 				transaction: transaction,
 				cancellationToken: cancellationToken);
-			return Result.FromNullable(mapper(result), new InvalidOperationException("Mapper returned null."));
+			var mapped = mapper(result);
+			return mapped is not null
+				? Result.From(mapped)
+				: Result<TModel>.Fail(new InvalidOperationException("Mapper returned null."));
 		}
 
 		#endregion
@@ -1619,7 +1626,7 @@ public static class SqlConnectionExtensions {
 
 				return rowsAffected > 0
 					? Result.Success
-					: Result.NotFound(key);
+					: Result.Fail(new NotFoundException(key));
 			} catch (Exception ex) when (ex.TryToResult(uniqueConstraintMessage, foreignKeyMessage, out var result)) {
 				return result;
 			}
@@ -1687,7 +1694,7 @@ public static class SqlConnectionExtensions {
 
 				return rowsAffected > 0
 					? resultSelector()
-					: Result.NotFound<T>(key);
+					: Result<T>.Fail(new NotFoundException(key));
 			} catch (Exception ex) when (ex.TryToResult<T>(uniqueConstraintMessage, foreignKeyMessage, out var result)) {
 				return result;
 			}
@@ -1816,7 +1823,7 @@ public static class SqlConnectionExtensions {
 
 				return rowsAffected > 0
 					? resultSelector()
-					: Result.NotFound<T>(key);
+					: Result<T>.Fail(new NotFoundException(key));
 			} catch (Exception ex) when (ex.TryToDeleteResult<T>(foreignKeyMessage, out var result)) {
 				return result;
 			}
@@ -2059,7 +2066,9 @@ public static class SqlConnectionExtensions {
 					transaction: transaction,
 					cancellationToken: cancellationToken);
 
-				return Result.FromLookup(result, key);
+				return result is not null
+					? Result.From(result)
+					: Result<T>.Fail(new NotFoundException(key));
 			} catch (Exception ex) when (ex.TryToResult<T>(uniqueConstraintMessage, foreignKeyMessage, out var result)) {
 				return result;
 			}
@@ -2099,7 +2108,7 @@ public static class SqlConnectionExtensions {
 					cancellationToken: cancellationToken);
 
 				if (result is null) {
-					return Result.NotFound<TModel>(key);
+					return Result<TModel>.Fail(new NotFoundException(key));
 				}
 				return mapper(result);
 			} catch (Exception ex) when (ex.TryToResult<TModel>(uniqueConstraintMessage, foreignKeyMessage, out var result)) {
@@ -2213,7 +2222,9 @@ public static class SqlConnectionExtensions {
 					transaction: transaction,
 					cancellationToken: cancellationToken);
 
-				return Result.FromLookup(result, key);
+				return result is not null
+					? Result.From(result)
+					: Result<T>.Fail(new NotFoundException(key));
 			} catch (Exception ex) when (ex.TryToDeleteResult(foreignKeyMessage, out var deleteResult)) {
 				return deleteResult.Error!;
 			}
@@ -2251,7 +2262,7 @@ public static class SqlConnectionExtensions {
 					cancellationToken: cancellationToken);
 
 				if (result is null) {
-					return Result.NotFound<TModel>(key);
+					return Result<TModel>.Fail(new NotFoundException(key));
 				}
 				return mapper(result);
 			} catch (Exception ex) when (ex.TryToDeleteResult(foreignKeyMessage, out var deleteResult)) {
@@ -2679,7 +2690,7 @@ public static class SqlConnectionExtensions {
 				}
 
 				return result is null
-					? Result.NotFound<T>(keys)
+					? Result<T>.Fail(new NotFoundException(keys))
 					: Result<T>.Success(result);
 			}
 		}
@@ -2745,7 +2756,7 @@ public static class SqlConnectionExtensions {
 				}
 
 				return result is null
-					? Result.NotFound<(T1, T2)>(keys)
+					? Result<(T1, T2)>.Fail(new NotFoundException(keys))
 					: Result<(T1, T2)>.Success(result.Value);
 			}
 		}
@@ -2813,7 +2824,7 @@ public static class SqlConnectionExtensions {
 				}
 
 				return result is null
-					? Result.NotFound<(T1, T2, T3)>(keys)
+					? Result<(T1, T2, T3)>.Fail(new NotFoundException(keys))
 					: Result<(T1, T2, T3)>.Success(result.Value);
 			}
 		}

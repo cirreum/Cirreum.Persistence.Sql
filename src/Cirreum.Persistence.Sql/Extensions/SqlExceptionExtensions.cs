@@ -127,12 +127,12 @@ public static class SqlExceptionExtensions {
 		out Result<T> result) {
 
 		if (ex.IsUniqueConstraintViolation()) {
-			result = Result.AlreadyExist<T>(uniqueConstraintMessage);
+			result = Result<T>.Fail(new AlreadyExistsException(uniqueConstraintMessage));
 			return true;
 		}
 
 		if (foreignKeyMessage is not null && ex.IsForeignKeyViolation()) {
-			result = Result.BadRequest<T>(foreignKeyMessage);
+			result = Result<T>.Fail(new BadRequestException(foreignKeyMessage));
 			return true;
 		}
 
@@ -177,7 +177,7 @@ public static class SqlExceptionExtensions {
 		out Result<T> result) {
 
 		if (ex.IsForeignKeyViolation()) {
-			result = Result.Conflict<T>(foreignKeyMessage);
+			result = Result<T>.Fail(new ConflictException(foreignKeyMessage));
 			return true;
 		}
 
@@ -220,10 +220,10 @@ public static class SqlExceptionExtensions {
 	/// </returns>
 	public static Result<T> ToResult<T>(this Exception ex) {
 		if (ex.IsUniqueConstraintViolation()) {
-			return Result.AlreadyExist<T>(ex.Message);
+			return Result<T>.Fail(new AlreadyExistsException(ex.Message));
 		}
 		if (ex.IsForeignKeyViolation()) {
-			return Result.BadRequest<T>(ex.Message);
+			return Result<T>.Fail(new BadRequestException(ex.Message));
 		}
 		return Result.Fail<T>(ex);
 	}
