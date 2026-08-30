@@ -1,4 +1,4 @@
-namespace Cirreum.Persistence.Sql.Test;
+namespace Cirreum.Persistence.Sql.Tests;
 
 using Cirreum;
 using Cirreum.Exceptions;
@@ -10,10 +10,7 @@ using System.Data;
 /// <summary>
 /// Tests for Optional&lt;T&gt; support (GetOptionalAsync, QueryOptionalAsync) and And* accumulator extensions.
 /// </summary>
-[TestClass]
 public sealed class OptionalAndAccumulatorTests {
-
-	public TestContext TestContext { get; set; } = null!;
 
 	private static (ISqlConnection conn, SqliteConnection rawConn) CreateConnection() {
 		var connection = new SqliteConnection("Data Source=:memory:");
@@ -51,7 +48,7 @@ public sealed class OptionalAndAccumulatorTests {
 
 	#region GetOptionalAsync - IDbConnection
 
-	[TestMethod]
+	[Fact]
 	public async Task GetOptionalAsync_WhenNoRowExists_ReturnsEmptyOptional() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -62,14 +59,14 @@ public sealed class OptionalAndAccumulatorTests {
 		var result = await conn.GetOptionalAsync<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = "nonexistent" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsTrue(result.Value.IsEmpty);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.IsEmpty.Should().BeTrue();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetOptionalAsync_WhenOneRowExists_ReturnsOptionalWithValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -83,15 +80,15 @@ public sealed class OptionalAndAccumulatorTests {
 		var result = await conn.GetOptionalAsync<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsTrue(result.Value.HasValue);
-		Assert.AreEqual("John", result.Value.Value.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.HasValue.Should().BeTrue();
+		result.Value.Value.Name.Should().Be("John");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetOptionalAsync_WhenMultipleRowsExist_ReturnsFailure() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -105,15 +102,15 @@ public sealed class OptionalAndAccumulatorTests {
 		// Act
 		var result = await conn.GetOptionalAsync<UserDto>(
 			"SELECT Id, Name, Email FROM Users",
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<InvalidOperationException>(result.Error);
-		Assert.Contains("more than one", result.Error.Message);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<InvalidOperationException>();
+		result.Error.Message.Should().Contain("more than one");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetOptionalAsync_WithMapper_WhenRowExists_TransformsResult() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -128,15 +125,15 @@ public sealed class OptionalAndAccumulatorTests {
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId },
 			dto => new User(dto.Id, dto.Name.ToUpper(), dto.Email),
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsTrue(result.Value.HasValue);
-		Assert.AreEqual("JANE", result.Value.Value.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.HasValue.Should().BeTrue();
+		result.Value.Value.Name.Should().Be("JANE");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetOptionalAsync_WithMapper_WhenNoRow_ReturnsEmptyOptional() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -148,18 +145,18 @@ public sealed class OptionalAndAccumulatorTests {
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = "nonexistent" },
 			dto => new User(dto.Id, dto.Name.ToUpper(), dto.Email),
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsTrue(result.Value.IsEmpty);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.IsEmpty.Should().BeTrue();
 	}
 
 	#endregion
 
 	#region QueryOptionalAsync - IDbConnection
 
-	[TestMethod]
+	[Fact]
 	public async Task QueryOptionalAsync_WhenNoRowExists_ReturnsEmptyOptional() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -170,14 +167,14 @@ public sealed class OptionalAndAccumulatorTests {
 		var result = await conn.QueryOptionalAsync<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = "nonexistent" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsTrue(result.Value.IsEmpty);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.IsEmpty.Should().BeTrue();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task QueryOptionalAsync_WhenOneRowExists_ReturnsOptionalWithValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -191,15 +188,15 @@ public sealed class OptionalAndAccumulatorTests {
 		var result = await conn.QueryOptionalAsync<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsTrue(result.Value.HasValue);
-		Assert.AreEqual("John", result.Value.Value.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.HasValue.Should().BeTrue();
+		result.Value.Value.Name.Should().Be("John");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task QueryOptionalAsync_WhenMultipleRowsExist_ReturnsFirstRow() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -213,15 +210,15 @@ public sealed class OptionalAndAccumulatorTests {
 		// Act - Query without ORDER BY, but SQLite returns in insert order
 		var result = await conn.QueryOptionalAsync<UserDto>(
 			"SELECT Id, Name, Email FROM Users ORDER BY Id",
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsTrue(result.Value.HasValue);
-		Assert.AreEqual("First", result.Value.Value.Name); // Should return first row
+		result.IsSuccess.Should().BeTrue();
+		result.Value.HasValue.Should().BeTrue();
+		result.Value.Value.Name.Should().Be("First"); // Should return first row
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task QueryOptionalAsync_WithMapper_WhenRowExists_TransformsResult() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -236,19 +233,19 @@ public sealed class OptionalAndAccumulatorTests {
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId },
 			dto => new User(dto.Id, dto.Name.ToUpper(), dto.Email),
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsTrue(result.Value.HasValue);
-		Assert.AreEqual("JANE", result.Value.Value.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.HasValue.Should().BeTrue();
+		result.Value.Value.Name.Should().Be("JANE");
 	}
 
 	#endregion
 
 	#region GetOptionalAsync/QueryOptionalAsync - DbContext
 
-	[TestMethod]
+	[Fact]
 	public async Task DbContext_GetOptionalAsync_WhenNoRow_ReturnsEmptyOptional() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -260,14 +257,14 @@ public sealed class OptionalAndAccumulatorTests {
 			ctx.GetOptionalAsync<UserDto>(
 				"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 				new { Id = "nonexistent" })
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsTrue(result.Value.IsEmpty);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.IsEmpty.Should().BeTrue();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbContext_GetOptionalAsync_WhenRowExists_ReturnsOptionalWithValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -282,15 +279,15 @@ public sealed class OptionalAndAccumulatorTests {
 			ctx.GetOptionalAsync<UserDto>(
 				"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 				new { Id = userId })
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsTrue(result.Value.HasValue);
-		Assert.AreEqual("Test", result.Value.Value.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.HasValue.Should().BeTrue();
+		result.Value.Value.Name.Should().Be("Test");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbContext_QueryOptionalAsync_WhenMultipleRows_ReturnsFirstRow() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -305,19 +302,19 @@ public sealed class OptionalAndAccumulatorTests {
 		var result = await conn.ExecuteTransactionAsync<Optional<UserDto>>(ctx =>
 			ctx.QueryOptionalAsync<UserDto>(
 				"SELECT Id, Name, Email FROM Users ORDER BY Id")
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsTrue(result.Value.HasValue);
-		Assert.AreEqual("First", result.Value.Value.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.HasValue.Should().BeTrue();
+		result.Value.Value.Name.Should().Be("First");
 	}
 
 	#endregion
 
 	#region And* Accumulator Extensions - Basic Tuple Building
 
-	[TestMethod]
+	[Fact]
 	public async Task AndGetAsync_BuildsTuple_T1_T2() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -340,15 +337,15 @@ public sealed class OptionalAndAccumulatorTests {
 				"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 				new { Id = user2Id },
 				user2Id)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("User1", result.Value.Item1.Name);
-		Assert.AreEqual("User2", result.Value.Item2.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Item1.Name.Should().Be("User1");
+		result.Value.Item2.Name.Should().Be("User2");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task AndGetAsync_BuildsTuple_T1_T2_T3() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -378,16 +375,16 @@ public sealed class OptionalAndAccumulatorTests {
 				"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 				new { Id = user3Id },
 				user3Id)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("User1", result.Value.Item1.Name);
-		Assert.AreEqual("User2", result.Value.Item2.Name);
-		Assert.AreEqual("User3", result.Value.Item3.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Item1.Name.Should().Be("User1");
+		result.Value.Item2.Name.Should().Be("User2");
+		result.Value.Item3.Name.Should().Be("User3");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task AndGetOptionalAsync_BuildsTupleWithOptional() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -407,15 +404,15 @@ public sealed class OptionalAndAccumulatorTests {
 			.AndGetOptionalAsync<UserDto, UserPrefsDto>(
 				"SELECT UserId, Theme FROM UserPrefs WHERE UserId = @UserId",
 				new { UserId = userId })
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("John", result.Value.Item1.Name);
-		Assert.IsTrue(result.Value.Item2.IsEmpty); // No prefs found
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Item1.Name.Should().Be("John");
+		result.Value.Item2.IsEmpty.Should().BeTrue(); // No prefs found
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task AndGetOptionalAsync_WithExistingOptional_ReturnsValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -436,16 +433,16 @@ public sealed class OptionalAndAccumulatorTests {
 			.AndGetOptionalAsync<UserDto, UserPrefsDto>(
 				"SELECT UserId, Theme FROM UserPrefs WHERE UserId = @UserId",
 				new { UserId = userId })
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("John", result.Value.Item1.Name);
-		Assert.IsTrue(result.Value.Item2.HasValue);
-		Assert.AreEqual("dark", result.Value.Item2.Value.Theme);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Item1.Name.Should().Be("John");
+		result.Value.Item2.HasValue.Should().BeTrue();
+		result.Value.Item2.Value.Theme.Should().Be("dark");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task AndQueryOptionalAsync_WithMultipleRows_ReturnsFirst() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -468,16 +465,16 @@ public sealed class OptionalAndAccumulatorTests {
 			.AndQueryOptionalAsync<UserDto, OrderDto>(
 				"SELECT Id, UserId, Amount FROM Orders WHERE UserId = @UserId ORDER BY Amount",
 				new { UserId = userId })
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("John", result.Value.Item1.Name);
-		Assert.IsTrue(result.Value.Item2.HasValue);
-		Assert.AreEqual(100.0, result.Value.Item2.Value.Amount); // First by amount
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Item1.Name.Should().Be("John");
+		result.Value.Item2.HasValue.Should().BeTrue();
+		result.Value.Item2.Value.Amount.Should().Be(100.0); // First by amount
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task AndQueryAnyAsync_AccumulatesList() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -500,15 +497,15 @@ public sealed class OptionalAndAccumulatorTests {
 			.AndQueryAnyAsync<UserDto, OrderDto>(
 				"SELECT Id, UserId, Amount FROM Orders WHERE UserId = @UserId",
 				new { UserId = userId })
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("John", result.Value.Item1.Name);
-		Assert.HasCount(2, result.Value.Item2);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Item1.Name.Should().Be("John");
+		result.Value.Item2.Should().HaveCount(2);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task AndGetScalarAsync_AccumulatesScalar() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -531,19 +528,19 @@ public sealed class OptionalAndAccumulatorTests {
 			.AndGetScalarAsync<UserDto, long>(
 				"SELECT COUNT(*) FROM Orders WHERE UserId = @UserId",
 				new { UserId = userId })
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("John", result.Value.Item1.Name);
-		Assert.AreEqual(2L, result.Value.Item2);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Item1.Name.Should().Be("John");
+		result.Value.Item2.Should().Be(2L);
 	}
 
 	#endregion
 
 	#region And* Accumulator Extensions - Short-circuit on failure
 
-	[TestMethod]
+	[Fact]
 	public async Task AndGetAsync_WhenFirstFails_ShortCircuits() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -568,15 +565,15 @@ public sealed class OptionalAndAccumulatorTests {
 				secondQueryExecuted = true;
 				return tuple;
 			})
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<NotFoundException>(result.Error);
-		Assert.IsFalse(secondQueryExecuted, "Second query should not execute after first failure");
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<NotFoundException>();
+		secondQueryExecuted.Should().BeFalse("Second query should not execute after first failure");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task AndGetAsync_WhenSecondFails_PropagatesError() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -596,18 +593,18 @@ public sealed class OptionalAndAccumulatorTests {
 				"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 				new { Id = "nonexistent" },
 				"nonexistent") // This fails
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<NotFoundException>(result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<NotFoundException>();
 	}
 
 	#endregion
 
 	#region Complex Accumulator Scenarios
 
-	[TestMethod]
+	[Fact]
 	public async Task ComplexAccumulator_UserWithPrefsAndOrders() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -635,18 +632,18 @@ public sealed class OptionalAndAccumulatorTests {
 			.AndQueryAnyAsync<UserDto, Optional<UserPrefsDto>, OrderDto>(
 				"SELECT Id, UserId, Amount FROM Orders WHERE UserId = @UserId",
 				new { UserId = userId })
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var (user, prefs, orders) = result.Value;
-		Assert.AreEqual("John", user.Name);
-		Assert.IsTrue(prefs.HasValue);
-		Assert.AreEqual("dark", prefs.Value.Theme);
-		Assert.HasCount(2, orders);
+		user.Name.Should().Be("John");
+		prefs.HasValue.Should().BeTrue();
+		prefs.Value.Theme.Should().Be("dark");
+		orders.Should().HaveCount(2);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ComplexAccumulator_UserWithOrderCountAndTotal() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -672,14 +669,14 @@ public sealed class OptionalAndAccumulatorTests {
 			.AndGetScalarAsync<UserDto, long, double>(
 				"SELECT COALESCE(SUM(Amount), 0) FROM Orders WHERE UserId = @UserId",
 				new { UserId = userId })
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var (user, count, total) = result.Value;
-		Assert.AreEqual("John", user.Name);
-		Assert.AreEqual(2L, count);
-		Assert.AreEqual(300.0, total);
+		user.Name.Should().Be("John");
+		count.Should().Be(2L);
+		total.Should().Be(300.0);
 	}
 
 	#endregion

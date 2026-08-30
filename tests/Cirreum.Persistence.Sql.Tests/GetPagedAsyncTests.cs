@@ -1,11 +1,10 @@
-namespace Cirreum.Persistence.Sql.Test;
+namespace Cirreum.Persistence.Sql.Tests;
 
 using Cirreum.Persistence;
 using Dapper;
 using Microsoft.Data.Sqlite;
 using System.Data;
 
-[TestClass]
 public sealed class GetPagedAsyncTests {
 
 	private static (ISqlConnection conn, SqliteConnection rawConn) CreateConnection() {
@@ -37,11 +36,9 @@ public sealed class GetPagedAsyncTests {
 		}
 	}
 
-	public TestContext TestContext { get; set; } = null!;
-
 	#region ISqlConnection.GetPagedAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task GetPagedAsync_WithExplicitPaging_ReturnsCorrectPage() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -60,19 +57,19 @@ public sealed class GetPagedAsyncTests {
 			sql,
 			pageSize: 10,
 			page: 2,
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(25, result.Value.TotalCount);
-		Assert.AreEqual(10, result.Value.PageSize);
-		Assert.AreEqual(3, result.Value.TotalPages);
-		Assert.HasCount(10, result.Value.Items);
-		Assert.AreEqual("Product 11", result.Value.Items[0].Name); // First item on page 2
-		Assert.AreEqual("Product 20", result.Value.Items[9].Name); // Last item on page 2
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.TotalCount.Should().Be(25);
+		result.Value.PageSize.Should().Be(10);
+		result.Value.TotalPages.Should().Be(3);
+		result.Value.Items.Should().HaveCount(10);
+		result.Value.Items[0].Name.Should().Be("Product 11"); // First item on page 2
+		result.Value.Items[9].Name.Should().Be("Product 20"); // Last item on page 2
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetPagedAsync_WithParametersObject_ReturnsCorrectPage() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -91,18 +88,18 @@ public sealed class GetPagedAsyncTests {
 		var result = await conn.GetPagedAsync<ProductDto>(
 			sql,
 			request,
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(11, result.Value.TotalCount); // Products 5-15 have Price >= 50
-		Assert.AreEqual(5, result.Value.PageSize);
-		Assert.AreEqual(3, result.Value.TotalPages);
-		Assert.HasCount(5, result.Value.Items);
-		Assert.AreEqual("Product 10", result.Value.Items[0].Name); // First item on page 2
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.TotalCount.Should().Be(11); // Products 5-15 have Price >= 50
+		result.Value.PageSize.Should().Be(5);
+		result.Value.TotalPages.Should().Be(3);
+		result.Value.Items.Should().HaveCount(5);
+		result.Value.Items[0].Name.Should().Be("Product 10"); // First item on page 2
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetPagedAsync_WithMapper_TransformsResults() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -120,15 +117,15 @@ public sealed class GetPagedAsyncTests {
 			sql,
 			new { PageSize = 5, Page = 1 },
 			dto => new Product(dto.Id, dto.Name.ToUpperInvariant(), dto.Price),
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(10, result.Value.TotalCount);
-		Assert.AreEqual("PRODUCT 1", result.Value.Items[0].Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.TotalCount.Should().Be(10);
+		result.Value.Items[0].Name.Should().Be("PRODUCT 1");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetPagedAsync_LastPage_ReturnsPartialResults() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -146,18 +143,18 @@ public sealed class GetPagedAsyncTests {
 			sql,
 			pageSize: 10,
 			page: 3,
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(23, result.Value.TotalCount);
-		Assert.AreEqual(3, result.Value.TotalPages);
-		Assert.HasCount(3, result.Value.Items); // Only 3 items on last page
-		Assert.AreEqual("Product 21", result.Value.Items[0].Name);
-		Assert.AreEqual("Product 23", result.Value.Items[2].Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.TotalCount.Should().Be(23);
+		result.Value.TotalPages.Should().Be(3);
+		result.Value.Items.Should().HaveCount(3); // Only 3 items on last page
+		result.Value.Items[0].Name.Should().Be("Product 21");
+		result.Value.Items[2].Name.Should().Be("Product 23");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetPagedAsync_EmptyResults_ReturnsEmptyPage() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -175,20 +172,20 @@ public sealed class GetPagedAsyncTests {
 			sql,
 			pageSize: 10,
 			page: 1,
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(0, result.Value.TotalCount);
-		Assert.AreEqual(0, result.Value.TotalPages);
-		Assert.IsEmpty(result.Value.Items);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.TotalCount.Should().Be(0);
+		result.Value.TotalPages.Should().Be(0);
+		result.Value.Items.Should().BeEmpty();
 	}
 
 	#endregion
 
 	#region DbContext.GetPagedAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task DbContext_GetPagedAsync_ReturnsCorrectPage() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -196,7 +193,7 @@ public sealed class GetPagedAsyncTests {
 		CreateTestSchema(rawConn);
 		SeedProducts(rawConn, 20);
 
-		var ctx = new DbContext(conn, null, this.TestContext.CancellationToken);
+		var ctx = new DbContext(conn, null, CancellationToken.None);
 
 		const string sql = """
 			SELECT COUNT(*) FROM Products;
@@ -207,17 +204,17 @@ public sealed class GetPagedAsyncTests {
 		var result = await ctx.GetPagedAsync<ProductDto>(sql, new { PageSize = 5, Page = 2 }).Result;
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(20, result.Value.TotalCount);
-		Assert.HasCount(5, result.Value.Items);
-		Assert.AreEqual("Product 6", result.Value.Items[0].Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.TotalCount.Should().Be(20);
+		result.Value.Items.Should().HaveCount(5);
+		result.Value.Items[0].Name.Should().Be("Product 6");
 	}
 
 	#endregion
 
 	#region DbResult.ThenGetPagedAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task ThenGetPagedAsync_WithParametersFactory_ChainsCorrectly() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -228,7 +225,7 @@ public sealed class GetPagedAsyncTests {
 		SeedProducts(rawConn, 15);
 		rawConn.Execute("UPDATE Products SET CategoryId = 1");
 
-		var ctx = new DbContext(conn, null, this.TestContext.CancellationToken);
+		var ctx = new DbContext(conn, null, CancellationToken.None);
 
 		// Act - Get category first, then get its products paged
 		var result = await ctx
@@ -242,13 +239,13 @@ public sealed class GetPagedAsyncTests {
 			.Result;
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(15, result.Value.TotalCount);
-		Assert.HasCount(5, result.Value.Items);
-		Assert.AreEqual("Product 6", result.Value.Items[0].Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.TotalCount.Should().Be(15);
+		result.Value.Items.Should().HaveCount(5);
+		result.Value.Items[0].Name.Should().Be("Product 6");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ThenGetPagedAsync_WithParametersObject_ChainsCorrectly() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -259,7 +256,7 @@ public sealed class GetPagedAsyncTests {
 		SeedProducts(rawConn, 12);
 		rawConn.Execute("UPDATE Products SET CategoryId = 1");
 
-		var ctx = new DbContext(conn, null, this.TestContext.CancellationToken);
+		var ctx = new DbContext(conn, null, CancellationToken.None);
 
 		var request = new GetCategoryProductsRequest { CategoryId = 1, PageSize = 4, Page = 3 };
 
@@ -275,15 +272,15 @@ public sealed class GetPagedAsyncTests {
 			.Result;
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(12, result.Value.TotalCount);
-		Assert.AreEqual(4, result.Value.PageSize);
-		Assert.AreEqual(3, result.Value.TotalPages);
-		Assert.HasCount(4, result.Value.Items);
-		Assert.AreEqual("Product 9", result.Value.Items[0].Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.TotalCount.Should().Be(12);
+		result.Value.PageSize.Should().Be(4);
+		result.Value.TotalPages.Should().Be(3);
+		result.Value.Items.Should().HaveCount(4);
+		result.Value.Items[0].Name.Should().Be("Product 9");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ThenGetPagedAsync_WhenFirstQueryFails_PropagatesFailure() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -291,7 +288,7 @@ public sealed class GetPagedAsyncTests {
 		CreateTestSchema(rawConn);
 		SeedProducts(rawConn, 10);
 
-		var ctx = new DbContext(conn, null, this.TestContext.CancellationToken);
+		var ctx = new DbContext(conn, null, CancellationToken.None);
 
 		// Act - First query fails (category doesn't exist)
 		var result = await ctx
@@ -302,14 +299,14 @@ public sealed class GetPagedAsyncTests {
 			.Result;
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
+		result.IsFailure.Should().BeTrue();
 	}
 
 	#endregion
 
 	#region ParameterHelper.MergeWithPaging validation
 
-	[TestMethod]
+	[Fact]
 	public async Task GetPagedAsync_WithMissingPageSize_ThrowsArgumentException() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -322,14 +319,14 @@ public sealed class GetPagedAsyncTests {
 			""";
 
 		// Act & Assert
-		await Assert.ThrowsExactlyAsync<ArgumentException>(async () =>
+		await Assert.ThrowsAsync<ArgumentException>(async () =>
 			await conn.GetPagedAsync<ProductDto>(
 				sql,
 				new { Page = 1 }, // Missing PageSize
-				cancellationToken: this.TestContext.CancellationToken));
+				cancellationToken: CancellationToken.None));
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetPagedAsync_WithMissingPage_ThrowsArgumentException() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -342,11 +339,11 @@ public sealed class GetPagedAsyncTests {
 			""";
 
 		// Act & Assert
-		await Assert.ThrowsExactlyAsync<ArgumentException>(async () =>
+		await Assert.ThrowsAsync<ArgumentException>(async () =>
 			await conn.GetPagedAsync<ProductDto>(
 				sql,
 				new { PageSize = 10 }, // Missing Page
-				cancellationToken: this.TestContext.CancellationToken));
+				cancellationToken: CancellationToken.None));
 	}
 
 	#endregion

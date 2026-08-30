@@ -1,4 +1,4 @@
-namespace Cirreum.Persistence.Sql.Test;
+namespace Cirreum.Persistence.Sql.Tests;
 
 using Cirreum;
 using Cirreum.Exceptions;
@@ -6,8 +6,7 @@ using Cirreum.Persistence;
 using Dapper;
 using Microsoft.Data.Sqlite;
 
-[TestClass]
-public sealed class DbConnectionFactoryExtensionsTests {
+public sealed class DbConnectionFactoryExtensionsTests : IDisposable {
 
 	/// <summary>
 	/// A test connection factory that uses a shared in-memory SQLite database.
@@ -65,21 +64,15 @@ public sealed class DbConnectionFactoryExtensionsTests {
 		}
 	}
 
-	private TestConnectionFactory _factory = null!;
+	private readonly TestConnectionFactory _factory = new();
 
-	[TestInitialize]
-	public void TestInitialize() {
-		this._factory = new TestConnectionFactory();
-	}
-
-	[TestCleanup]
-	public void TestCleanup() {
-		this._factory?.Dispose();
+	public void Dispose() {
+		this._factory.Dispose();
 	}
 
 	#region ExecuteAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task ExecuteAsync_NonGeneric_ExecutesAction() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
@@ -89,13 +82,13 @@ public sealed class DbConnectionFactoryExtensionsTests {
 			ctx.InsertAsync(
 				"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 				new { Id = userId, Name = "John", Email = "john@test.com" })
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ExecuteAsync_Generic_ReturnsValue() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
@@ -109,18 +102,18 @@ public sealed class DbConnectionFactoryExtensionsTests {
 				"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 				new { Id = userId },
 				userId);
-		}, this.TestContext.CancellationToken);
+		}, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("John", result.Value.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Name.Should().Be("John");
 	}
 
 	#endregion
 
 	#region ExecuteTransactionAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task ExecuteTransactionAsync_NonGeneric_CommitsOnSuccess() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
@@ -130,21 +123,21 @@ public sealed class DbConnectionFactoryExtensionsTests {
 			ctx.InsertAsync(
 				"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 				new { Id = userId, Name = "John", Email = "john@test.com" })
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 
 		// Verify commit by reading from a new connection
 		var verifyResult = await this._factory.GetAsync<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId },
 			userId,
-			this.TestContext.CancellationToken);
-		Assert.IsTrue(verifyResult.IsSuccess);
+			CancellationToken.None);
+		verifyResult.IsSuccess.Should().BeTrue();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ExecuteTransactionAsync_Generic_ReturnsValue() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
@@ -155,14 +148,14 @@ public sealed class DbConnectionFactoryExtensionsTests {
 				"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 				new { Id = userId, Name = "John", Email = "john@test.com" },
 				() => userId)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(userId, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(userId);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ExecuteTransactionAsync_RollsBackOnFailure() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
@@ -174,68 +167,68 @@ public sealed class DbConnectionFactoryExtensionsTests {
 				new { Id = userId, Name = "Invalid", Email = "invalid@test.com" },
 				() => new UserDto(userId, "Invalid", "invalid@test.com"))
 			.EnsureAsync(u => u.Name.StartsWith("Valid"), new BadRequestException("Must be valid"))
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
+		result.IsFailure.Should().BeTrue();
 
 		// Verify rollback - user should not exist
 		var verifyResult = await this._factory.GetAsync<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId },
 			userId,
-			this.TestContext.CancellationToken);
-		Assert.IsTrue(verifyResult.IsFailure);
-		Assert.IsInstanceOfType<NotFoundException>(verifyResult.Error);
+			CancellationToken.None);
+		verifyResult.IsFailure.Should().BeTrue();
+		verifyResult.Error.Should().BeOfType<NotFoundException>();
 	}
 
 	#endregion
 
 	#region GetAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task GetAsync_WhenRecordExists_ReturnsSuccess() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = userId, Name = "John", Email = "john@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Act
 		var result = await this._factory.GetAsync<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId },
 			userId,
-			this.TestContext.CancellationToken);
+			CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("John", result.Value.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Name.Should().Be("John");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetAsync_WhenRecordDoesNotExist_ReturnsNotFound() {
 		// Act
 		var result = await this._factory.GetAsync<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = "nonexistent" },
 			"nonexistent",
-			this.TestContext.CancellationToken);
+			CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<NotFoundException>(result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<NotFoundException>();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetAsync_WithMapper_TransformsResult() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = userId, Name = "Jane", Email = "jane@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Act
 		var result = await this._factory.GetAsync<UserDto, User>(
@@ -243,212 +236,212 @@ public sealed class DbConnectionFactoryExtensionsTests {
 			new { Id = userId },
 			userId,
 			dto => new User(dto.Id, dto.Name.ToUpperInvariant(), dto.Email),
-			this.TestContext.CancellationToken);
+			CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("JANE", result.Value.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Name.Should().Be("JANE");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetAsync_WithoutParameters_Works() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = userId, Name = "Solo", Email = "solo@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Act - Use overload without parameters
 		var result = await this._factory.GetAsync<UserDto>(
 			$"SELECT Id, Name, Email FROM Users WHERE Id = '{userId}'",
 			userId,
-			this.TestContext.CancellationToken);
+			CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("Solo", result.Value.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Name.Should().Be("Solo");
 	}
 
 	#endregion
 
 	#region GetScalarAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task GetScalarAsync_ReturnsScalarValue() {
 		// Arrange
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = Guid.NewGuid().ToString(), Name = "User1", Email = "user1@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Act
 		var result = await this._factory.GetScalarAsync<long>(
 			"SELECT COUNT(*) FROM Users",
-			this.TestContext.CancellationToken);
+			CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1L, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetScalarAsync_WithParameters_ReturnsValue() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = userId, Name = "John", Email = "john@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Act
 		var result = await this._factory.GetScalarAsync<long>(
 			"SELECT COUNT(*) FROM Users WHERE Name = @Name",
 			new { Name = "John" },
-			this.TestContext.CancellationToken);
+			CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1L, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetScalarAsync_WithMapper_TransformsValue() {
 		// Arrange
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = Guid.NewGuid().ToString(), Name = "User1", Email = "user1@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = Guid.NewGuid().ToString(), Name = "User2", Email = "user2@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Act
 		var result = await this._factory.GetScalarAsync<long, string>(
 			"SELECT COUNT(*) FROM Users",
 			count => $"Total: {count}",
-			this.TestContext.CancellationToken);
+			CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("Total: 2", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("Total: 2");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetScalarAsync_WhenNull_ReturnsFailure() {
 		// Act - Empty table, MAX returns NULL
 		var result = await this._factory.GetScalarAsync<string>(
 			"SELECT MAX(Name) FROM Users",
-			this.TestContext.CancellationToken);
+			CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<InvalidOperationException>(result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<InvalidOperationException>();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetScalarAsync_WithMapper_WhenNull_MapperReceivesNull() {
 		// Act
 		var result = await this._factory.GetScalarAsync<string?, string>(
 			"SELECT MAX(Name) FROM Users",
 			value => value ?? "Empty",
-			this.TestContext.CancellationToken);
+			CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("Empty", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("Empty");
 	}
 
 	#endregion
 
 	#region QueryAnyAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task QueryAnyAsync_ReturnsAllRecords() {
 		// Arrange
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = Guid.NewGuid().ToString(), Name = "User1", Email = "user1@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = Guid.NewGuid().ToString(), Name = "User2", Email = "user2@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Act
 		var result = await this._factory.QueryAnyAsync<UserDto>(
 			"SELECT Id, Name, Email FROM Users ORDER BY Name",
-			this.TestContext.CancellationToken);
+			CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.HasCount(2, result.Value);
-		Assert.AreEqual("User1", result.Value[0].Name);
-		Assert.AreEqual("User2", result.Value[1].Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().HaveCount(2);
+		result.Value[0].Name.Should().Be("User1");
+		result.Value[1].Name.Should().Be("User2");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task QueryAnyAsync_WhenEmpty_ReturnsEmptyList() {
 		// Act
 		var result = await this._factory.QueryAnyAsync<UserDto>(
 			"SELECT Id, Name, Email FROM Users",
-			this.TestContext.CancellationToken);
+			CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsEmpty(result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().BeEmpty();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task QueryAnyAsync_WithParameters_FiltersResults() {
 		// Arrange
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = Guid.NewGuid().ToString(), Name = "John", Email = "john@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = Guid.NewGuid().ToString(), Name = "Jane", Email = "jane@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Act
 		var result = await this._factory.QueryAnyAsync<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Name = @Name",
 			new { Name = "John" },
-			this.TestContext.CancellationToken);
+			CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.HasCount(1, result.Value);
-		Assert.AreEqual("John", result.Value[0].Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().HaveCount(1);
+		result.Value[0].Name.Should().Be("John");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task QueryAnyAsync_WithMapper_TransformsResults() {
 		// Arrange
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = Guid.NewGuid().ToString(), Name = "john", Email = "john@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Act
 		var result = await this._factory.QueryAnyAsync<UserDto, User>(
 			"SELECT Id, Name, Email FROM Users",
 			dto => new User(dto.Id, dto.Name.ToUpperInvariant(), dto.Email),
-			this.TestContext.CancellationToken);
+			CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.HasCount(1, result.Value);
-		Assert.AreEqual("JOHN", result.Value[0].Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().HaveCount(1);
+		result.Value[0].Name.Should().Be("JOHN");
 	}
 
 	#endregion
 
 	#region InsertAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task InsertAsync_ReturnsSuccess() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
@@ -457,13 +450,13 @@ public sealed class DbConnectionFactoryExtensionsTests {
 		var result = await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = userId, Name = "John", Email = "john@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task InsertAsync_WithResultSelector_ReturnsValue() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
@@ -473,59 +466,59 @@ public sealed class DbConnectionFactoryExtensionsTests {
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = userId, Name = "John", Email = "john@test.com" },
 			() => userId,
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(userId, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(userId);
 	}
 
 	#endregion
 
 	#region UpdateAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task UpdateAsync_WhenRowsAffected_ReturnsSuccess() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = userId, Name = "John", Email = "john@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Act
 		var result = await this._factory.UpdateAsync(
 			"UPDATE Users SET Name = @Name WHERE Id = @Id",
 			new { Id = userId, Name = "Jane" },
 			userId,
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task UpdateAsync_WhenNoRowsAffected_ReturnsNotFound() {
 		// Act
 		var result = await this._factory.UpdateAsync(
 			"UPDATE Users SET Name = @Name WHERE Id = @Id",
 			new { Id = "nonexistent", Name = "Jane" },
 			"nonexistent",
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<NotFoundException>(result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<NotFoundException>();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task UpdateAsync_WithResultSelector_ReturnsValue() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = userId, Name = "John", Email = "john@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Act
 		var result = await this._factory.UpdateAndReturnAsync(
@@ -533,56 +526,56 @@ public sealed class DbConnectionFactoryExtensionsTests {
 			new { Id = userId, Name = "Jane" },
 			userId,
 			() => "Updated",
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("Updated", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("Updated");
 	}
 
 	#endregion
 
 	#region DeleteAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task DeleteAsync_WhenRowsAffected_ReturnsSuccess() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = userId, Name = "John", Email = "john@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Act
 		var result = await this._factory.DeleteAsync(
 			"DELETE FROM Users WHERE Id = @Id",
 			new { Id = userId },
 			userId,
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DeleteAsync_WhenNoRowsAffected_ReturnsNotFound() {
 		// Act
 		var result = await this._factory.DeleteAsync(
 			"DELETE FROM Users WHERE Id = @Id",
 			new { Id = "nonexistent" },
 			"nonexistent",
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<NotFoundException>(result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<NotFoundException>();
 	}
 
 	#endregion
 
 	#region Fluent Chaining via Factory
 
-	[TestMethod]
+	[Fact]
 	public async Task Factory_ExecuteTransactionAsync_FluentChaining_Works() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
@@ -602,16 +595,16 @@ public sealed class DbConnectionFactoryExtensionsTests {
 				"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 				id => new { Id = id },
 				orderId)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(orderId, result.Value.Id);
-		Assert.AreEqual(userId, result.Value.UserId);
-		Assert.AreEqual(100.0, result.Value.Amount);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Id.Should().Be(orderId);
+		result.Value.UserId.Should().Be(userId);
+		result.Value.Amount.Should().Be(100.0);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task Factory_ExecuteTransactionAsync_FluentChaining_WhereFailure_RollsBack() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
@@ -634,47 +627,47 @@ public sealed class DbConnectionFactoryExtensionsTests {
 				"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 				order => new { order.Id },
 				orderId)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert - The chain should have failed at EnsureAsync
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<BadRequestException>(result.Error);
-		Assert.AreEqual("Order amount must be at least 100", result.Error.Message);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<BadRequestException>();
+		result.Error.Message.Should().Be("Order amount must be at least 100");
 
 		// Verify rollback - neither user nor order should exist
 		var userResult = await this._factory.GetAsync<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId },
 			userId,
-			this.TestContext.CancellationToken);
-		Assert.IsTrue(userResult.IsFailure);
-		Assert.IsInstanceOfType<NotFoundException>(userResult.Error);
+			CancellationToken.None);
+		userResult.IsFailure.Should().BeTrue();
+		userResult.Error.Should().BeOfType<NotFoundException>();
 
 		var orderResult = await this._factory.GetAsync<OrderDto>(
 			"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 			new { Id = orderId },
 			orderId,
-			this.TestContext.CancellationToken);
-		Assert.IsTrue(orderResult.IsFailure);
-		Assert.IsInstanceOfType<NotFoundException>(orderResult.Error);
+			CancellationToken.None);
+		orderResult.IsFailure.Should().BeTrue();
+		orderResult.Error.Should().BeOfType<NotFoundException>();
 	}
 
 	#endregion
 
 	#region MultipleGetAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleGetAsync_ReturnsValue_WhenMapperReturnsValue() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = userId, Name = "John", Email = "john@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 		await this._factory.InsertAsync(
 			"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 			new { Id = Guid.NewGuid().ToString(), UserId = userId, Amount = 100.0 },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Act
 		var result = await this._factory.MultipleGetAsync<UserWithOrders>(
@@ -690,15 +683,15 @@ public sealed class DbConnectionFactoryExtensionsTests {
 				var orders = (await reader.ReadAsync<OrderDto>()).ToList();
 				return new UserWithOrders(user, orders);
 			},
-			this.TestContext.CancellationToken);
+			CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("John", result.Value.User.Name);
-		Assert.HasCount(1, result.Value.Orders);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.User.Name.Should().Be("John");
+		result.Value.Orders.Should().HaveCount(1);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleGetAsync_ReturnsNotFound_WhenMapperReturnsNull() {
 		// Act
 		var result = await this._factory.MultipleGetAsync<UserWithOrders>(
@@ -714,20 +707,20 @@ public sealed class DbConnectionFactoryExtensionsTests {
 				var orders = (await reader.ReadAsync<OrderDto>()).ToList();
 				return new UserWithOrders(user, orders);
 			},
-			this.TestContext.CancellationToken);
+			CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<NotFoundException>(result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<NotFoundException>();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleGetAsync_WithoutParameters_Works() {
 		// Arrange
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = Guid.NewGuid().ToString(), Name = "John", Email = "john@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Act
 		var result = await this._factory.MultipleGetAsync<int>(
@@ -738,142 +731,142 @@ public sealed class DbConnectionFactoryExtensionsTests {
 				var orderCount = await reader.ReadSingleOrDefaultAsync<int>();
 				return userCount + orderCount;
 			},
-			this.TestContext.CancellationToken);
+			CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1);
 	}
 
 	#endregion
 
 	#region MultipleGetOptionalAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleGetOptionalAsync_ReturnsOptionalWithValue_WhenMapperReturnsValue() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = userId, Name = "John", Email = "john@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Act
 		var result = await this._factory.MultipleGetOptionalAsync<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id;",
 			new { Id = userId },
 			async reader => await reader.ReadSingleOrDefaultAsync<UserDto>(),
-			this.TestContext.CancellationToken);
+			CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsTrue(result.Value.HasValue);
-		Assert.AreEqual("John", result.Value.Value.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.HasValue.Should().BeTrue();
+		result.Value.Value.Name.Should().Be("John");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleGetOptionalAsync_ReturnsEmptyOptional_WhenMapperReturnsNull() {
 		// Act
 		var result = await this._factory.MultipleGetOptionalAsync<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id;",
 			new { Id = "nonexistent" },
 			async reader => await reader.ReadSingleOrDefaultAsync<UserDto>(),
-			this.TestContext.CancellationToken);
+			CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsFalse(result.Value.HasValue);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.HasValue.Should().BeFalse();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleGetOptionalAsync_WithoutParameters_Works() {
 		// Act
 		var result = await this._factory.MultipleGetOptionalAsync<int>(
 			"SELECT COUNT(*) FROM Users;",
 			async reader => await reader.ReadSingleOrDefaultAsync<int>(),
-			this.TestContext.CancellationToken);
+			CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsTrue(result.Value.HasValue);
-		Assert.AreEqual(0, result.Value.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.HasValue.Should().BeTrue();
+		result.Value.Value.Should().Be(0);
 	}
 
 	#endregion
 
 	#region MultipleQueryAnyAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleQueryAnyAsync_ReturnsList_WhenMapperReturnsList() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = userId, Name = "John", Email = "john@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 		await this._factory.InsertAsync(
 			"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 			new { Id = Guid.NewGuid().ToString(), UserId = userId, Amount = 100.0 },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 		await this._factory.InsertAsync(
 			"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 			new { Id = Guid.NewGuid().ToString(), UserId = userId, Amount = 200.0 },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Act
 		var result = await this._factory.MultipleQueryAnyAsync<OrderDto>(
 			"SELECT Id, UserId, Amount FROM Orders WHERE UserId = @UserId;",
 			new { UserId = userId },
 			async reader => [.. (await reader.ReadAsync<OrderDto>())],
-			this.TestContext.CancellationToken);
+			CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.HasCount(2, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().HaveCount(2);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleQueryAnyAsync_ReturnsEmptyList_WhenNoResults() {
 		// Act
 		var result = await this._factory.MultipleQueryAnyAsync<OrderDto>(
 			"SELECT Id, UserId, Amount FROM Orders WHERE UserId = @UserId;",
 			new { UserId = "nonexistent" },
 			async reader => [.. (await reader.ReadAsync<OrderDto>())],
-			this.TestContext.CancellationToken);
+			CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsEmpty(result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().BeEmpty();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleQueryAnyAsync_WithoutParameters_Works() {
 		// Arrange
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = Guid.NewGuid().ToString(), Name = "User1", Email = "user1@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = Guid.NewGuid().ToString(), Name = "User2", Email = "user2@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Act
 		var result = await this._factory.MultipleQueryAnyAsync<UserDto>(
 			"SELECT Id, Name, Email FROM Users;",
 			async reader => [.. (await reader.ReadAsync<UserDto>())],
-			this.TestContext.CancellationToken);
+			CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.HasCount(2, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().HaveCount(2);
 	}
 
 	#endregion
 
 	#region InsertWithCountAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task InsertWithCountAsync_ReturnsRowCount_WhenInsertSucceeds() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
@@ -882,21 +875,21 @@ public sealed class DbConnectionFactoryExtensionsTests {
 		var result = await this._factory.InsertWithCountAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = userId, Name = "John", Email = "john@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task InsertWithCountAsync_ReturnsZero_WhenConditionalInsertMatchesNothing() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = userId, Name = "John", Email = "john@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Act - Try to insert only if email doesn't exist (it does, so 0 rows)
 		var result = await this._factory.InsertWithCountAsync(
@@ -906,131 +899,131 @@ public sealed class DbConnectionFactoryExtensionsTests {
 			WHERE NOT EXISTS (SELECT 1 FROM Users WHERE Email = @Email)
 			""",
 			new { Id = Guid.NewGuid().ToString(), Name = "Jane", Email = "john@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(0, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(0);
 	}
 
 	#endregion
 
 	#region UpdateWithCountAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task UpdateWithCountAsync_ReturnsRowCount_WhenUpdateSucceeds() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = userId, Name = "John", Email = "john@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Act
 		var result = await this._factory.UpdateWithCountAsync(
 			"UPDATE Users SET Name = @Name WHERE Id = @Id",
 			new { Id = userId, Name = "Johnny" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task UpdateWithCountAsync_ReturnsZero_WhenNoRowsMatch() {
 		// Act
 		var result = await this._factory.UpdateWithCountAsync(
 			"UPDATE Users SET Name = @Name WHERE Id = @Id",
 			new { Id = Guid.NewGuid().ToString(), Name = "Johnny" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(0, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(0);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task UpdateWithCountAsync_ReturnsMultiple_WhenMultipleRowsMatch() {
 		// Arrange
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = Guid.NewGuid().ToString(), Name = "John", Email = "john1@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = Guid.NewGuid().ToString(), Name = "John", Email = "john2@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Act
 		var result = await this._factory.UpdateWithCountAsync(
 			"UPDATE Users SET Name = @NewName WHERE Name = @OldName",
 			new { OldName = "John", NewName = "Johnny" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(2, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(2);
 	}
 
 	#endregion
 
 	#region DeleteWithCountAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task DeleteWithCountAsync_ReturnsRowCount_WhenDeleteSucceeds() {
 		// Arrange
 		var userId = Guid.NewGuid().ToString();
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = userId, Name = "John", Email = "john@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Act
 		var result = await this._factory.DeleteWithCountAsync(
 			"DELETE FROM Users WHERE Id = @Id",
 			new { Id = userId },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DeleteWithCountAsync_ReturnsZero_WhenNoRowsMatch() {
 		// Act
 		var result = await this._factory.DeleteWithCountAsync(
 			"DELETE FROM Users WHERE Id = @Id",
 			new { Id = Guid.NewGuid().ToString() },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(0, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(0);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DeleteWithCountAsync_ReturnsMultiple_WhenMultipleRowsMatch() {
 		// Arrange
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = Guid.NewGuid().ToString(), Name = "John", Email = "john1@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 		await this._factory.InsertAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = Guid.NewGuid().ToString(), Name = "John", Email = "john2@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Act
 		var result = await this._factory.DeleteWithCountAsync(
 			"DELETE FROM Users WHERE Name = @Name",
 			new { Name = "John" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(2, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(2);
 	}
 
 	#endregion
@@ -1041,8 +1034,6 @@ public sealed class DbConnectionFactoryExtensionsTests {
 	private record User(string Id, string Name, string Email);
 	private record OrderDto(string Id, string UserId, double Amount);
 	private record UserWithOrders(UserDto User, IReadOnlyList<OrderDto> Orders);
-
-	public TestContext TestContext { get; set; }
 
 	#endregion
 

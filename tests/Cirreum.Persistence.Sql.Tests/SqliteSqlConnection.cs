@@ -1,4 +1,4 @@
-namespace Cirreum.Persistence.Sql.Test;
+namespace Cirreum.Persistence.Sql.Tests;
 
 using Cirreum.Persistence;
 using Dapper;

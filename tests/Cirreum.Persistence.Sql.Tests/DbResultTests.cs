@@ -1,14 +1,13 @@
-namespace Cirreum.Persistence.Sql.Test;
+namespace Cirreum.Persistence.Sql.Tests;
 
 using Cirreum;
 using Cirreum.Exceptions;
 
-[TestClass]
 public sealed class DbResultTests {
 
 	#region Error Propagation
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_WhenFailure_PropagatesErrorThroughMapAsync() {
 		// Arrange
 		var error = new NotFoundException("Not found");
@@ -20,11 +19,11 @@ public sealed class DbResultTests {
 		var result = await mapped;
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.AreSame(error, result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeSameAs(error);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_WhenFailure_PropagatesErrorThroughEnsureAsync() {
 		// Arrange
 		var error = new BadRequestException("Bad request");
@@ -36,11 +35,11 @@ public sealed class DbResultTests {
 		var result = await filtered;
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.AreSame(error, result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeSameAs(error);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_WhenSuccess_MapAsyncTransformsValue() {
 		// Arrange
 		var successResult = Task.FromResult(Result.From(42));
@@ -51,11 +50,11 @@ public sealed class DbResultTests {
 		var result = await mapped;
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(84, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(84);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_WhenSuccess_AsyncMapAsyncTransformsValue() {
 		// Arrange
 		var successResult = Task.FromResult(Result.From(42));
@@ -63,21 +62,21 @@ public sealed class DbResultTests {
 
 		// Act
 		var mapped = dbResult.MapAsync((Func<int, Task<int>>)(async x => {
-			await Task.Delay(1, this.TestContext.CancellationToken);
+			await Task.Delay(1, CancellationToken.None);
 			return x * 2;
 		}));
 		var result = await mapped;
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(84, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(84);
 	}
 
 	#endregion
 
 	#region EnsureAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_EnsureAsync_WhenPredicateTrue_ReturnsSuccess() {
 		// Arrange
 		var successResult = Task.FromResult(Result.From("Hello"));
@@ -88,11 +87,11 @@ public sealed class DbResultTests {
 		var result = await filtered;
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("Hello", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("Hello");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_EnsureAsync_WhenPredicateFalse_ReturnsProvidedError() {
 		// Arrange
 		var successResult = Task.FromResult(Result.From("Hi"));
@@ -104,11 +103,11 @@ public sealed class DbResultTests {
 		var result = await filtered;
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.AreSame(expectedError, result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeSameAs(expectedError);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_EnsureAsync_WithAsyncPredicate_WhenTrue_ReturnsSuccess() {
 		// Arrange
 		var successResult = Task.FromResult(Result.From(10));
@@ -117,18 +116,18 @@ public sealed class DbResultTests {
 		// Act
 		var filtered = dbResult.EnsureAsync(
 			async x => {
-				await Task.Delay(1, this.TestContext.CancellationToken);
+				await Task.Delay(1, CancellationToken.None);
 				return x > 5;
 			},
 			new BadRequestException("Too small"));
 		var result = await filtered;
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(10, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(10);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_EnsureAsync_WithAsyncPredicate_WhenFalse_ReturnsError() {
 		// Arrange
 		var successResult = Task.FromResult(Result.From(3));
@@ -138,22 +137,22 @@ public sealed class DbResultTests {
 		// Act
 		var filtered = dbResult.EnsureAsync(
 			async x => {
-				await Task.Delay(1, this.TestContext.CancellationToken);
+				await Task.Delay(1, CancellationToken.None);
 				return x > 5;
 			},
 			expectedError);
 		var result = await filtered;
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.AreSame(expectedError, result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeSameAs(expectedError);
 	}
 
 	#endregion
 
 	#region Implicit Conversion
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_ImplicitlyConvertsToTaskOfResult() {
 		// Arrange
 		var successResult = Task.FromResult(Result.From(42));
@@ -164,11 +163,11 @@ public sealed class DbResultTests {
 		var result = await task;
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(42, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(42);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_CanBeAwaitedDirectly() {
 		// Arrange
 		var successResult = Task.FromResult(Result.From("test"));
@@ -178,15 +177,15 @@ public sealed class DbResultTests {
 		var result = await dbResult; // uses GetAwaiter
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("test", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("test");
 	}
 
 	#endregion
 
 	#region Chaining Multiple Operations
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_ChainingMapAndEnsure_Success() {
 		// Arrange
 		var successResult = Task.FromResult(Result.From(10));
@@ -199,11 +198,11 @@ public sealed class DbResultTests {
 			.MapAsync(x => $"Value: {x}");
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("Value: 20", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("Value: 20");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_ChainingMapAndEnsure_FailsAtEnsure() {
 		// Arrange
 		var successResult = Task.FromResult(Result.From(5));
@@ -217,11 +216,11 @@ public sealed class DbResultTests {
 			.MapAsync(x => $"Value: {x}"); // should not execute
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.AreSame(expectedError, result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeSameAs(expectedError);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_ChainingWithInitialFailure_PropagatesError() {
 		// Arrange
 		var initialError = new NotFoundException("Initial failure");
@@ -243,17 +242,17 @@ public sealed class DbResultTests {
 			.MapAsync(x => $"Value: {x}");
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.AreSame(initialError, result.Error);
-		Assert.IsFalse(mapperCalled, "Mapper should not be called when initial result is failure");
-		Assert.IsFalse(predicateCalled, "Predicate should not be called when initial result is failure");
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeSameAs(initialError);
+		mapperCalled.Should().BeFalse("Mapper should not be called when initial result is failure");
+		predicateCalled.Should().BeFalse("Predicate should not be called when initial result is failure");
 	}
 
 	#endregion
 
 	#region ThenAsync (to non-generic Result)
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_ThenAsync_WhenSuccess_ExecutesNext() {
 		// Arrange
 		var successResult = Task.FromResult(Result.From(42));
@@ -262,18 +261,18 @@ public sealed class DbResultTests {
 
 		// Act
 		var result = await dbResult.ThenAsync(async x => {
-			await Task.Delay(1, this.TestContext.CancellationToken);
+			await Task.Delay(1, CancellationToken.None);
 			nextExecuted = true;
-			Assert.AreEqual(42, x);
+			x.Should().Be(42);
 			return Result.Success;
 		});
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsTrue(nextExecuted);
+		result.IsSuccess.Should().BeTrue();
+		nextExecuted.Should().BeTrue();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_ThenAsync_WhenFailure_DoesNotExecuteNext() {
 		// Arrange
 		var error = new NotFoundException("Not found");
@@ -283,24 +282,22 @@ public sealed class DbResultTests {
 
 		// Act
 		var result = await dbResult.ThenAsync(async _ => {
-			await Task.Delay(1, this.TestContext.CancellationToken);
+			await Task.Delay(1, CancellationToken.None);
 			nextExecuted = true;
 			return Result.Success;
 		});
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.AreSame(error, result.Error);
-		Assert.IsFalse(nextExecuted);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeSameAs(error);
+		nextExecuted.Should().BeFalse();
 	}
-
-	public TestContext TestContext { get; set; }
 
 	#endregion
 
 	#region ThenAsync (to generic Result<TResult>)
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_ThenAsyncGeneric_WhenSuccess_ExecutesNextAndReturnsValue() {
 		// Arrange
 		var successResult = Task.FromResult(Result.From(42));
@@ -308,16 +305,16 @@ public sealed class DbResultTests {
 
 		// Act
 		var result = await dbResult.ThenAsync(async x => {
-			await Task.Delay(1, this.TestContext.CancellationToken);
+			await Task.Delay(1, CancellationToken.None);
 			return Result.From($"Value was {x}");
 		});
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("Value was 42", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("Value was 42");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_ThenAsyncGeneric_WhenFailure_DoesNotExecuteNext() {
 		// Arrange
 		var error = new NotFoundException("Not found");
@@ -327,18 +324,18 @@ public sealed class DbResultTests {
 
 		// Act
 		var result = await dbResult.ThenAsync(async _ => {
-			await Task.Delay(1, this.TestContext.CancellationToken);
+			await Task.Delay(1, CancellationToken.None);
 			nextExecuted = true;
 			return Result.From("Should not reach");
 		});
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.AreSame(error, result.Error);
-		Assert.IsFalse(nextExecuted);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeSameAs(error);
+		nextExecuted.Should().BeFalse();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_ThenAsyncGeneric_WhenNextFails_PropagatesError() {
 		// Arrange
 		var successResult = Task.FromResult(Result.From(42));
@@ -347,27 +344,24 @@ public sealed class DbResultTests {
 
 		// Act
 		var result = await dbResult.ThenAsync(async _ => {
-			await Task.Delay(1, this.TestContext.CancellationToken);
+			await Task.Delay(1, CancellationToken.None);
 			return Result.Fail<string>(nextError);
 		});
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.AreSame(nextError, result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeSameAs(nextError);
 	}
 
 	#endregion
 
 }
 
-[TestClass]
 public sealed class DbResultNonGenericTests {
-
-	public TestContext TestContext { get; set; }
 
 	#region Implicit Conversion
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultNonGeneric_ImplicitlyConvertsToTaskOfResult() {
 		// Arrange
 		var successResult = Task.FromResult(Result.Success);
@@ -378,10 +372,10 @@ public sealed class DbResultNonGenericTests {
 		var result = await task;
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultNonGeneric_CanBeAwaitedDirectly() {
 		// Arrange
 		var successResult = Task.FromResult(Result.Success);
@@ -391,10 +385,10 @@ public sealed class DbResultNonGenericTests {
 		var result = await dbResult; // uses GetAwaiter
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultNonGeneric_WithFailure_PropagatesError() {
 		// Arrange
 		var error = new BadRequestException("Something went wrong");
@@ -405,15 +399,15 @@ public sealed class DbResultNonGenericTests {
 		var result = await dbResult;
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.AreSame(error, result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeSameAs(error);
 	}
 
 	#endregion
 
 	#region ThenAsync (to non-generic Result)
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultNonGeneric_ThenAsync_WhenSuccess_ExecutesNext() {
 		// Arrange
 		var successResult = Task.FromResult(Result.Success);
@@ -422,17 +416,17 @@ public sealed class DbResultNonGenericTests {
 
 		// Act
 		var result = await dbResult.ThenAsync(async () => {
-			await Task.Delay(1, this.TestContext.CancellationToken);
+			await Task.Delay(1, CancellationToken.None);
 			nextExecuted = true;
 			return Result.Success;
 		});
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsTrue(nextExecuted);
+		result.IsSuccess.Should().BeTrue();
+		nextExecuted.Should().BeTrue();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultNonGeneric_ThenAsync_WhenFailure_DoesNotExecuteNext() {
 		// Arrange
 		var error = new NotFoundException("Not found");
@@ -442,18 +436,18 @@ public sealed class DbResultNonGenericTests {
 
 		// Act
 		var result = await dbResult.ThenAsync(async () => {
-			await Task.Delay(1, this.TestContext.CancellationToken);
+			await Task.Delay(1, CancellationToken.None);
 			nextExecuted = true;
 			return Result.Success;
 		});
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.AreSame(error, result.Error);
-		Assert.IsFalse(nextExecuted);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeSameAs(error);
+		nextExecuted.Should().BeFalse();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultNonGeneric_ThenAsync_WhenNextFails_PropagatesError() {
 		// Arrange
 		var successResult = Task.FromResult(Result.Success);
@@ -462,20 +456,20 @@ public sealed class DbResultNonGenericTests {
 
 		// Act
 		var result = await dbResult.ThenAsync(async () => {
-			await Task.Delay(1, this.TestContext.CancellationToken);
+			await Task.Delay(1, CancellationToken.None);
 			return Result.Fail(nextError);
 		});
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.AreSame(nextError, result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeSameAs(nextError);
 	}
 
 	#endregion
 
 	#region ThenAsync (to generic Result<T>)
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultNonGeneric_ThenAsyncGeneric_WhenSuccess_ExecutesNextAndReturnsValue() {
 		// Arrange
 		var successResult = Task.FromResult(Result.Success);
@@ -483,16 +477,16 @@ public sealed class DbResultNonGenericTests {
 
 		// Act
 		var result = await dbResult.ThenAsync(async () => {
-			await Task.Delay(1, this.TestContext.CancellationToken);
+			await Task.Delay(1, CancellationToken.None);
 			return Result.From(42);
 		});
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(42, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(42);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultNonGeneric_ThenAsyncGeneric_WhenFailure_DoesNotExecuteNext() {
 		// Arrange
 		var error = new NotFoundException("Not found");
@@ -502,18 +496,18 @@ public sealed class DbResultNonGenericTests {
 
 		// Act
 		var result = await dbResult.ThenAsync(async () => {
-			await Task.Delay(1, this.TestContext.CancellationToken);
+			await Task.Delay(1, CancellationToken.None);
 			nextExecuted = true;
 			return Result.From(42);
 		});
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.AreSame(error, result.Error);
-		Assert.IsFalse(nextExecuted);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeSameAs(error);
+		nextExecuted.Should().BeFalse();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultNonGeneric_ThenAsyncGeneric_WhenNextFails_PropagatesError() {
 		// Arrange
 		var successResult = Task.FromResult(Result.Success);
@@ -522,13 +516,13 @@ public sealed class DbResultNonGenericTests {
 
 		// Act
 		var result = await dbResult.ThenAsync(async () => {
-			await Task.Delay(1, this.TestContext.CancellationToken);
+			await Task.Delay(1, CancellationToken.None);
 			return Result.Fail<int>(nextError);
 		});
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.AreSame(nextError, result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeSameAs(nextError);
 	}
 
 	#endregion

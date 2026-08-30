@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <File Path="../src/Directory.Build.props" />
+    <Project Path="../src/Cirreum.Persistence.Sql/Cirreum.Persistence.Sql.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <File Path="Directory.Build.props" />
+    <Project Path="Cirreum.Persistence.Sql.Tests/Cirreum.Persistence.Sql.Tests.csproj" />
+  </Folder>
+</Solution>

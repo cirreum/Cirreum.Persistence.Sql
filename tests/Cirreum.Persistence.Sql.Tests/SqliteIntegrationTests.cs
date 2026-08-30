@@ -1,4 +1,4 @@
-namespace Cirreum.Persistence.Sql.Test;
+namespace Cirreum.Persistence.Sql.Tests;
 
 using Cirreum;
 using Cirreum.Exceptions;
@@ -7,7 +7,6 @@ using Dapper;
 using Microsoft.Data.Sqlite;
 using System.Data;
 
-[TestClass]
 public sealed class SqliteIntegrationTests {
 
 	private static (ISqlConnection conn, SqliteConnection rawConn) CreateConnection() {
@@ -35,7 +34,7 @@ public sealed class SqliteIntegrationTests {
 
 	#region Query Methods
 
-	[TestMethod]
+	[Fact]
 	public async Task GetAsync_WhenRecordExists_ReturnsSuccess() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -49,15 +48,15 @@ public sealed class SqliteIntegrationTests {
 		var result = await conn.GetAsync<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId },
-			userId, cancellationToken: this.TestContext.CancellationToken);
+			userId, cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("John", result.Value.Name);
-		Assert.AreEqual("john@test.com", result.Value.Email);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Name.Should().Be("John");
+		result.Value.Email.Should().Be("john@test.com");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetAsync_WhenRecordDoesNotExist_ReturnsFailure() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -68,14 +67,14 @@ public sealed class SqliteIntegrationTests {
 		var result = await conn.GetAsync<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = "nonexistent" },
-			"nonexistent", cancellationToken: this.TestContext.CancellationToken);
+			"nonexistent", cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<NotFoundException>(result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<NotFoundException>();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetAsync_WithMapper_TransformsResult() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -90,14 +89,14 @@ public sealed class SqliteIntegrationTests {
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId },
 			userId,
-			dto => new User(dto.Id, dto.Name, dto.Email), cancellationToken: this.TestContext.CancellationToken);
+			dto => new User(dto.Id, dto.Name, dto.Email), cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("Jane", result.Value.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Name.Should().Be("Jane");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task QueryAnyAsync_ReturnsAllRecords() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -109,14 +108,14 @@ public sealed class SqliteIntegrationTests {
 			new { Id = Guid.NewGuid().ToString(), Name = "User2", Email = "user2@test.com" });
 
 		// Act
-		var result = await conn.QueryAnyAsync<UserDto>("SELECT Id, Name, Email FROM Users", cancellationToken: this.TestContext.CancellationToken);
+		var result = await conn.QueryAnyAsync<UserDto>("SELECT Id, Name, Email FROM Users", cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.HasCount(2, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().HaveCount(2);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task QueryAnyAsync_WhenEmpty_ReturnsEmptyList() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -124,14 +123,14 @@ public sealed class SqliteIntegrationTests {
 		CreateTestSchema(rawConn);
 
 		// Act
-		var result = await conn.QueryAnyAsync<UserDto>("SELECT Id, Name, Email FROM Users", cancellationToken: this.TestContext.CancellationToken);
+		var result = await conn.QueryAnyAsync<UserDto>("SELECT Id, Name, Email FROM Users", cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsEmpty(result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().BeEmpty();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetScalarAsync_ReturnsScalarValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -143,14 +142,14 @@ public sealed class SqliteIntegrationTests {
 			new { Id = Guid.NewGuid().ToString(), Name = "User2", Email = "user2@test.com" });
 
 		// Act
-		var result = await conn.GetScalarAsync<long>("SELECT COUNT(*) FROM Users", cancellationToken: this.TestContext.CancellationToken);
+		var result = await conn.GetScalarAsync<long>("SELECT COUNT(*) FROM Users", cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(2L, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(2L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetScalarAsync_WithMapper_TransformsResult() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -162,18 +161,18 @@ public sealed class SqliteIntegrationTests {
 		// Act
 		var result = await conn.GetScalarAsync<long, string>(
 			"SELECT COUNT(*) FROM Users",
-			count => $"Total: {count}", cancellationToken: this.TestContext.CancellationToken);
+			count => $"Total: {count}", cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("Total: 1", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("Total: 1");
 	}
 
 	#endregion
 
 	#region TransactionBuilder Basic Operations
 
-	[TestMethod]
+	[Fact]
 	public async Task TransactionBuilder_GetAsync_ReturnsDbResult() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -189,14 +188,14 @@ public sealed class SqliteIntegrationTests {
 				"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 				new { Id = userId },
 				userId)
-, this.TestContext.CancellationToken);
+, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("Test", result.Value.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Name.Should().Be("Test");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task TransactionBuilder_GetScalarAsync_ReturnsValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -208,14 +207,14 @@ public sealed class SqliteIntegrationTests {
 		// Act
 		var result = await conn.ExecuteTransactionAsync(async db => {
 			return await db.GetScalarAsync<long>("SELECT COUNT(*) FROM Users");
-		}, this.TestContext.CancellationToken);
+		}, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1L, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task TransactionBuilder_QueryAnyAsync_ReturnsResults() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -229,18 +228,18 @@ public sealed class SqliteIntegrationTests {
 		// Act
 		var result = await conn.ExecuteTransactionAsync(async db => {
 			return await db.QueryAnyAsync<UserDto>("SELECT Id, Name, Email FROM Users");
-		}, this.TestContext.CancellationToken);
+		}, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.HasCount(2, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().HaveCount(2);
 	}
 
 	#endregion
 
 	#region Fluent Chaining
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_GetThenMap_Success() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -257,14 +256,14 @@ public sealed class SqliteIntegrationTests {
 				new { Id = userId },
 				userId)
 			.MapAsync(u => new User(u.Id, u.Name, u.Email))
-, this.TestContext.CancellationToken);
+, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("John", result.Value.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Name.Should().Be("John");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_GetThenWhere_PassesFilter() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -281,14 +280,14 @@ public sealed class SqliteIntegrationTests {
 				new { Id = userId },
 				userId)
 			.EnsureAsync(u => u.Name.StartsWith("Valid"), new BadRequestException("Invalid user"))
-, this.TestContext.CancellationToken);
+, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("ValidUser", result.Value.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Name.Should().Be("ValidUser");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_GetThenEnsure_FailsValidation() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -306,14 +305,14 @@ public sealed class SqliteIntegrationTests {
 				new { Id = userId },
 				userId)
 			.EnsureAsync(u => u.Name.StartsWith("Valid"), expectedError)
-, this.TestContext.CancellationToken);
+, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.AreSame(expectedError, result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeSameAs(expectedError);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_GetThenGetScalar_ChainsOperations() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -336,14 +335,14 @@ public sealed class SqliteIntegrationTests {
 			.ThenGetScalarAsync<long>(
 				"SELECT COUNT(*) FROM Orders WHERE UserId = @UserId",
 				new { UserId = userId })
-, this.TestContext.CancellationToken);
+, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(2L, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(2L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_GetThenQueryAny_ChainsOperations() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -366,16 +365,16 @@ public sealed class SqliteIntegrationTests {
 			.ThenQueryAnyAsync<OrderDto>(
 				"SELECT Id, UserId, Amount FROM Orders WHERE UserId = @UserId",
 				new { UserId = userId })
-, this.TestContext.CancellationToken);
+, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.HasCount(2, result.Value);
-		Assert.AreEqual(100.0, result.Value[0].Amount);
-		Assert.AreEqual(200.0, result.Value[1].Amount);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().HaveCount(2);
+		result.Value[0].Amount.Should().Be(100.0);
+		result.Value[1].Amount.Should().Be(200.0);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_NotFoundPropagates_ThroughChain() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -394,15 +393,15 @@ public sealed class SqliteIntegrationTests {
 				scalarExecuted = true;
 				return count;
 			})
-, this.TestContext.CancellationToken);
+, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<NotFoundException>(result.Error);
-		Assert.IsFalse(scalarExecuted, "Subsequent operations should not execute after failure");
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<NotFoundException>();
+		scalarExecuted.Should().BeFalse("Subsequent operations should not execute after failure");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_MultipleGetOperations() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -425,18 +424,18 @@ public sealed class SqliteIntegrationTests {
 				"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 				new { Id = user2Id },
 				user2Id)
-, this.TestContext.CancellationToken);
+, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("User2", result.Value.Name); // Second get result
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Name.Should().Be("User2"); // Second get result
 	}
 
 	#endregion
 
 	#region Insert/Update/Delete Chaining
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_GetThenInsert_ReturnsDbResultNonGeneric() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -458,15 +457,15 @@ public sealed class SqliteIntegrationTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				new { Id = orderId, UserId = userId, Amount = 150.0 })
 			.ToResult()
-, this.TestContext.CancellationToken);
+, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var count = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { Id = orderId });
-		Assert.AreEqual(1L, count);
+		count.Should().Be(1L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_GetThenInsertWithParametersFactory_UsesPreviousValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -488,19 +487,19 @@ public sealed class SqliteIntegrationTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				user => new { Id = orderId, UserId = user.Id, Amount = 250.0 })
 			.ToResult()
-			, this.TestContext.CancellationToken);
+			, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var order = rawConn.QueryFirstOrDefault<OrderDto>(
 			"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 			new { Id = orderId });
-		Assert.IsNotNull(order);
-		Assert.AreEqual(userId, order.UserId);
-		Assert.AreEqual(250.0, order.Amount);
+		order.Should().NotBeNull();
+		order.UserId.Should().Be(userId);
+		order.Amount.Should().Be(250.0);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_GetThenInsertWithResultSelector_ReturnsDbResultT() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -522,14 +521,14 @@ public sealed class SqliteIntegrationTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				new { Id = orderId, UserId = userId, Amount = 350.0 },
 				_ => orderId)
-			, this.TestContext.CancellationToken);
+			, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(orderId, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(orderId);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_GetThenInsertWithFactoryAndResultSelector_ReturnsDbResultT() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -551,15 +550,15 @@ public sealed class SqliteIntegrationTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				user => new { Id = orderId, UserId = user.Id, Amount = 450.0 },
 				_ => (orderId, "John"))
-			, this.TestContext.CancellationToken);
+			, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(orderId, result.Value.OrderId);
-		Assert.AreEqual("John", result.Value.UserName);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.OrderId.Should().Be(orderId);
+		result.Value.UserName.Should().Be("John");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_InsertThenGetScalar_ChainsFromNonGeneric() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -581,14 +580,14 @@ public sealed class SqliteIntegrationTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				user => new { Id = orderId, UserId = user.Id, Amount = 100.0 })
 			.ThenGetScalarAsync<long>("SELECT COUNT(*) FROM Orders WHERE UserId = @UserId", new { UserId = userId })
-			, this.TestContext.CancellationToken);
+			, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1L, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_InsertThenInsert_ChainsMultipleInserts() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -614,15 +613,15 @@ public sealed class SqliteIntegrationTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				new { Id = orderId2, UserId = userId, Amount = 200.0 })
 			.ToResult()
-			, this.TestContext.CancellationToken);
+			, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var count = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE UserId = @UserId", new { UserId = userId });
-		Assert.AreEqual(2L, count);
+		count.Should().Be(2L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_GetThenUpdate_ReturnsDbResultNonGeneric() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -643,15 +642,15 @@ public sealed class SqliteIntegrationTests {
 				new { Id = userId, Name = "Jane" },
 				userId)
 			.ToResult()
-			, this.TestContext.CancellationToken);
+			, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var updatedName = rawConn.ExecuteScalar<string>("SELECT Name FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual("Jane", updatedName);
+		updatedName.Should().Be("Jane");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_GetThenUpdateWithParametersFactory_UsesPreviousValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -672,15 +671,15 @@ public sealed class SqliteIntegrationTests {
 				user => new { user.Id, NewName = user.Name + " Updated" },
 				userId)
 			.ToResult()
-			, this.TestContext.CancellationToken);
+			, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var updatedName = rawConn.ExecuteScalar<string>("SELECT Name FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual("John Updated", updatedName);
+		updatedName.Should().Be("John Updated");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_GetThenUpdateWithResultSelector_ReturnsDbResultT() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -701,14 +700,14 @@ public sealed class SqliteIntegrationTests {
 				new { Id = userId, Name = "Jane" },
 				userId,
 				_ => "Updated successfully")
-			, this.TestContext.CancellationToken);
+			, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("Updated successfully", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("Updated successfully");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_GetThenDelete_ReturnsDbResultNonGeneric() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -729,15 +728,15 @@ public sealed class SqliteIntegrationTests {
 				new { Id = userId },
 				userId)
 			.ToResult()
-			, this.TestContext.CancellationToken);
+			, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var count = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual(0L, count);
+		count.Should().Be(0L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_GetThenDeleteWithParametersFactory_UsesPreviousValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -758,15 +757,15 @@ public sealed class SqliteIntegrationTests {
 				user => new { user.Id },
 				userId)
 			.ToResult()
-			, this.TestContext.CancellationToken);
+			, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var count = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual(0L, count);
+		count.Should().Be(0L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_FailurePropagates_ThroughInsertChain() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -787,15 +786,15 @@ public sealed class SqliteIntegrationTests {
 					return new { Id = Guid.NewGuid().ToString(), UserId = "test", Amount = 100.0 };
 				})
 			.ToResult()
-			, this.TestContext.CancellationToken);
+			, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<NotFoundException>(result.Error);
-		Assert.IsFalse(insertExecuted, "Insert should not execute after failure");
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<NotFoundException>();
+		insertExecuted.Should().BeFalse("Insert should not execute after failure");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_ComplexChain_GetInsertUpdateGetScalar() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -821,16 +820,16 @@ public sealed class SqliteIntegrationTests {
 				new { Id = userId, Name = "John (with order)" },
 				userId)
 			.ThenGetScalarAsync<long>("SELECT COUNT(*) FROM Orders WHERE UserId = @UserId", new { UserId = userId })
-			, this.TestContext.CancellationToken);
+			, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1L, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1L);
 		var updatedName = rawConn.ExecuteScalar<string>("SELECT Name FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual("John (with order)", updatedName);
+		updatedName.Should().Be("John (with order)");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_DbResultNonGeneric_ThenInsertWithResultSelector() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -856,18 +855,18 @@ public sealed class SqliteIntegrationTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				new { Id = orderId2, UserId = userId, Amount = 200.0 },
 				_ => orderId2)
-			, this.TestContext.CancellationToken);
+			, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(orderId2, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(orderId2);
 	}
 
 	#endregion
 
 	#region TransactionBuilder Direct Insert/Update/Delete Chaining
 
-	[TestMethod]
+	[Fact]
 	public async Task TransactionBuilder_InsertThenUpdate_ChainsFromInsert() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -884,15 +883,15 @@ public sealed class SqliteIntegrationTests {
 				"UPDATE Users SET Name = @Name WHERE Id = @Id",
 				new { Id = userId, Name = "Jane" },
 				userId)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var name = rawConn.ExecuteScalar<string>("SELECT Name FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual("Jane", name);
+		name.Should().Be("Jane");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task TransactionBuilder_InsertThenInsert_ChainsMultipleInserts() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -909,17 +908,17 @@ public sealed class SqliteIntegrationTests {
 			.ThenInsertAsync(
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				new { Id = orderId, UserId = userId, Amount = 100.0 })
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var userCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Users WHERE Id = @Id", new { Id = userId });
 		var orderCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { Id = orderId });
-		Assert.AreEqual(1L, userCount);
-		Assert.AreEqual(1L, orderCount);
+		userCount.Should().Be(1L);
+		orderCount.Should().Be(1L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task TransactionBuilder_InsertThenGetAsync_ChainsToQuery() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -936,15 +935,15 @@ public sealed class SqliteIntegrationTests {
 				"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 				new { Id = userId },
 				userId)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("John", result.Value.Name);
-		Assert.AreEqual("john@test.com", result.Value.Email);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Name.Should().Be("John");
+		result.Value.Email.Should().Be("john@test.com");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task TransactionBuilder_InsertWithResultSelector_ThenUpdate_ChainsFromTypedInsert() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -963,15 +962,15 @@ public sealed class SqliteIntegrationTests {
 				id => new { Id = id, Name = "Updated via chain" },
 				userId)
 			.ToResult()
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var name = rawConn.ExecuteScalar<string>("SELECT Name FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual("Updated via chain", name);
+		name.Should().Be("Updated via chain");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task TransactionBuilder_UpdateThenDelete_ChainsFromUpdate() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -991,15 +990,15 @@ public sealed class SqliteIntegrationTests {
 				"DELETE FROM Users WHERE Id = @Id",
 				new { Id = userId },
 				userId)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var count = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual(0L, count);
+		count.Should().Be(0L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task TransactionBuilder_DeleteThenInsert_ChainsFromDelete() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1019,17 +1018,17 @@ public sealed class SqliteIntegrationTests {
 			.ThenInsertAsync(
 				"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 				new { Id = newUserId, Name = "NewUser", Email = "new@test.com" })
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var oldCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Users WHERE Id = @Id", new { Id = oldUserId });
 		var newCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Users WHERE Id = @Id", new { Id = newUserId });
-		Assert.AreEqual(0L, oldCount);
-		Assert.AreEqual(1L, newCount);
+		oldCount.Should().Be(0L);
+		newCount.Should().Be(1L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task TransactionBuilder_InsertThenUpdateThenGetScalar_ComplexChain() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1051,20 +1050,20 @@ public sealed class SqliteIntegrationTests {
 				new { Id = userId, Name = "John (with order)" },
 				userId)
 			.ThenGetScalarAsync<long>("SELECT COUNT(*) FROM Orders")
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1L, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1L);
 		var userName = rawConn.ExecuteScalar<string>("SELECT Name FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual("John (with order)", userName);
+		userName.Should().Be("John (with order)");
 	}
 
 	#endregion
 
 	#region Complex Chaining Patterns: Mutator -> Query -> Mutator -> Query
 
-	[TestMethod]
+	[Fact]
 	public async Task Insert_ThenGet_ThenUpdate_ChainsWithParametersFactory() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1087,15 +1086,15 @@ public sealed class SqliteIntegrationTests {
 				user => new { user.Id, Name = $"{user.Name} (verified)" },
 				userId)
 			.ToResult()
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var name = rawConn.ExecuteScalar<string>("SELECT Name FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual("John (verified)", name);
+		name.Should().Be("John (verified)");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task Insert_ThenGetScalar_ThenInsert_ChainsWithScalarValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1117,16 +1116,16 @@ public sealed class SqliteIntegrationTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				count => new { Id = orderId, UserId = userId, Amount = (double)(count * 100) },
 				_ => orderId)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(orderId, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(orderId);
 		var amount = rawConn.ExecuteScalar<double>("SELECT Amount FROM Orders WHERE Id = @Id", new { Id = orderId });
-		Assert.AreEqual(100.0, amount); // 1 user * 100
+		amount.Should().Be(100.0); // 1 user * 100
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task Insert_ThenWhere_ThenUpdate_ChainsWithValidation() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1146,15 +1145,15 @@ public sealed class SqliteIntegrationTests {
 				user => new { user.Id, Name = $"{user.Name} (email verified)" },
 				userId)
 			.ToResult()
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var name = rawConn.ExecuteScalar<string>("SELECT Name FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual("John (email verified)", name);
+		name.Should().Be("John (email verified)");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task Insert_ThenEnsure_Fails_ShortCircuits() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1174,17 +1173,17 @@ public sealed class SqliteIntegrationTests {
 				user => new { user.Id, Name = "Should not reach here" },
 				userId)
 			.ToResult()
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<BadRequestException>(result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<BadRequestException>();
 		// Transaction was rolled back, so no user exists
 		var count = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual(0L, count); // Insert was rolled back
+		count.Should().Be(0L); // Insert was rolled back
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task Update_ThenGet_ThenDelete_ThenQueryAny() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1213,15 +1212,15 @@ public sealed class SqliteIntegrationTests {
 				user => new { user.Id },
 				userId1)
 			.ThenQueryAnyAsync<UserDto>("SELECT Id, Name, Email FROM Users")
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.HasCount(1, result.Value); // Only Jane remains
-		Assert.AreEqual("Jane", result.Value[0].Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().HaveCount(1); // Only Jane remains
+		result.Value[0].Name.Should().Be("Jane");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task Insert_ThenQueryAny_ThenInsert_UsingQueryResults() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1247,15 +1246,15 @@ public sealed class SqliteIntegrationTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				users => new { Id = orderId, UserId = users[0].Id, Amount = users.Count * 50.0 })
 			.ToResult()
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var order = rawConn.QueryFirst<OrderDto>("SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id", new { Id = orderId });
-		Assert.AreEqual(100.0, order.Amount); // 2 users * 50
+		order.Amount.Should().Be(100.0); // 2 users * 50
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task Delete_ThenGetScalar_ThenUpdate_ConditionalUpdate() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1280,15 +1279,15 @@ public sealed class SqliteIntegrationTests {
 				count => new { Id = userId2, Name = $"Last of {count}" },
 				userId2)
 			.ToResult()
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var name = rawConn.ExecuteScalar<string>("SELECT Name FROM Users WHERE Id = @Id", new { Id = userId2 });
-		Assert.AreEqual("Last of 1", name);
+		name.Should().Be("Last of 1");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task Insert_ThenMap_ThenUpdate_TransformsValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1308,15 +1307,15 @@ public sealed class SqliteIntegrationTests {
 				user => new { user.Id, user.Name },
 				userId)
 			.ToResult()
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var name = rawConn.ExecuteScalar<string>("SELECT Name FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual("JOHN DOE", name);
+		name.Should().Be("JOHN DOE");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task Insert_ThenGet_ThenInsert_ThenGet_LongChain() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1343,16 +1342,16 @@ public sealed class SqliteIntegrationTests {
 				"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 				id => new { Id = id },
 				orderId)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(orderId, result.Value.Id);
-		Assert.AreEqual(userId, result.Value.UserId);
-		Assert.AreEqual(250.0, result.Value.Amount);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Id.Should().Be(orderId);
+		result.Value.UserId.Should().Be(userId);
+		result.Value.Amount.Should().Be(250.0);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task Update_ThenQueryAny_ThenDelete_BatchOperations() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1383,19 +1382,19 @@ public sealed class SqliteIntegrationTests {
 				activeUsers => new { activeUsers[0].Id },
 				"first-active")
 			.ToResult()
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var remainingCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Users");
-		Assert.AreEqual(2L, remainingCount); // One was deleted
+		remainingCount.Should().Be(2L); // One was deleted
 		var names = rawConn.Query<string>("SELECT Name FROM Users ORDER BY Name").ToList();
-		Assert.Contains("Active2", names);
-		Assert.Contains("StillInactive", names);
-		Assert.DoesNotContain("Active1", names); // First active was deleted
+		names.Should().Contain("Active2");
+		names.Should().Contain("StillInactive");
+		names.Should().NotContain("Active1"); // First active was deleted
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task InsertWithResultSelector_ThenGetScalar_ThenUpdate_ThenGetScalar_MultipleScalars() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1420,20 +1419,20 @@ public sealed class SqliteIntegrationTests {
 			.ThenGetScalarAsync<long>(
 				"SELECT COUNT(*) FROM Users",
 				_ => null)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1L, result.Value); // Still 1 user
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1L); // Still 1 user
 		var name = rawConn.ExecuteScalar<string>("SELECT Name FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual("User #1", name);
+		name.Should().Be("User #1");
 	}
 
 	#endregion
 
 	#region GetScalarAsync Null Handling
 
-	[TestMethod]
+	[Fact]
 	public async Task GetScalarAsync_WhenSqlReturnsNull_ReturnsFailureWithInvalidOperationException() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1444,15 +1443,15 @@ public sealed class SqliteIntegrationTests {
 		// Act
 		var result = await conn.GetScalarAsync<string>(
 			"SELECT MAX(Name) FROM Users",
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<InvalidOperationException>(result.Error);
-		Assert.Contains("null", result.Error.Message.ToLowerInvariant());
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<InvalidOperationException>();
+		result.Error.Message.ToLowerInvariant().Should().Contain("null");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetScalarAsync_WhenSqlReturnsNullableColumnWithValue_ReturnsSuccess() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1464,14 +1463,14 @@ public sealed class SqliteIntegrationTests {
 		// Act
 		var result = await conn.GetScalarAsync<string>(
 			"SELECT MAX(Name) FROM Users",
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("John", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("John");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetScalarAsync_WithCoalesceForNullColumn_ReturnsDefaultValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1482,14 +1481,14 @@ public sealed class SqliteIntegrationTests {
 		// Act
 		var result = await conn.GetScalarAsync<string>(
 			"SELECT COALESCE(MAX(Name), 'No Users') FROM Users",
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("No Users", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("No Users");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetScalarAsync_WithMapper_WhenSqlReturnsNull_MapperReceivesNull() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1505,15 +1504,15 @@ public sealed class SqliteIntegrationTests {
 				receivedValue = value;
 				return value ?? "Default";
 			},
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsNull(receivedValue, "Mapper should receive null when SQL returns NULL");
-		Assert.AreEqual("Default", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		receivedValue.Should().BeNull("Mapper should receive null when SQL returns NULL");
+		result.Value.Should().Be("Default");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetScalarAsync_WithMapper_WhenMapperReturnsNull_ReturnsFailure() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1526,15 +1525,15 @@ public sealed class SqliteIntegrationTests {
 		var result = await conn.GetScalarAsync<string?, string?>(
 			"SELECT MAX(Name) FROM Users",
 			_ => null!, // Mapper intentionally returns null
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<InvalidOperationException>(result.Error);
-		Assert.Contains("mapper", result.Error.Message.ToLowerInvariant());
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<InvalidOperationException>();
+		result.Error.Message.ToLowerInvariant().Should().Contain("mapper");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetScalarAsync_WithMapper_WhenSqlReturnsValue_MapperTransformsIt() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1549,14 +1548,14 @@ public sealed class SqliteIntegrationTests {
 		var result = await conn.GetScalarAsync<long, string>(
 			"SELECT COUNT(*) FROM Users",
 			count => $"Total users: {count}",
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("Total users: 2", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("Total users: 2");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task GetScalarAsync_WithMapperAndParameters_WhenSqlReturnsNull_MapperReceivesNull() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1569,18 +1568,18 @@ public sealed class SqliteIntegrationTests {
 			"SELECT MAX(Name) FROM Users WHERE Id = @Id",
 			new { Id = "nonexistent" },
 			value => value ?? "Not Found",
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("Not Found", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("Not Found");
 	}
 
 	#endregion
 
 	#region GetScalarAsync Null Handling in Transactions
 
-	[TestMethod]
+	[Fact]
 	public async Task TransactionContext_GetScalarAsync_WhenSqlReturnsNull_ReturnsFailure() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1590,14 +1589,14 @@ public sealed class SqliteIntegrationTests {
 		// Act
 		var result = await conn.ExecuteTransactionAsync<string>(db =>
 			db.GetScalarAsync<string>("SELECT MAX(Name) FROM Users")
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<InvalidOperationException>(result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<InvalidOperationException>();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task TransactionContext_GetScalarAsync_WithMapper_MapperReceivesNull() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1609,14 +1608,14 @@ public sealed class SqliteIntegrationTests {
 			db.GetScalarAsync<string?, string>(
 				"SELECT MAX(Name) FROM Users",
 				value => value ?? "Empty Table")
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("Empty Table", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("Empty Table");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_ThenGetScalarAsync_WhenSqlReturnsNull_PropagatesFailure() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1634,14 +1633,14 @@ public sealed class SqliteIntegrationTests {
 				userId)
 			.ThenGetScalarAsync<string>(
 				"SELECT MAX(Name) FROM Users WHERE Id = 'nonexistent'") // Returns NULL
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<InvalidOperationException>(result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<InvalidOperationException>();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_ThenGetScalarAsync_WithMapper_HandlesNull() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1660,18 +1659,18 @@ public sealed class SqliteIntegrationTests {
 			.ThenGetScalarAsync<string?, string>(
 				"SELECT MAX(Name) FROM Users WHERE Id = 'nonexistent'",
 				value => value ?? "No matching users")
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("No matching users", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("No matching users");
 	}
 
 	#endregion
 
 	#region Conditional Operations (when: parameter)
 
-	[TestMethod]
+	[Fact]
 	public async Task ThenInsertIfAsync_WithWhenTrue_ExecutesInsert() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1692,18 +1691,18 @@ public sealed class SqliteIntegrationTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				user => new { Id = orderId, UserId = user.Id, Amount = 100.0 },
 				when: _ => true)  // Always execute
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var order = rawConn.QuerySingleOrDefault<OrderDto>(
 			"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 			new { Id = orderId });
-		Assert.IsNotNull(order);
-		Assert.AreEqual(100.0, order.Amount);
+		order.Should().NotBeNull();
+		order.Amount.Should().Be(100.0);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ThenInsertIfAsync_WithWhenFalse_SkipsInsert() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1724,17 +1723,17 @@ public sealed class SqliteIntegrationTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				user => new { Id = orderId, UserId = user.Id, Amount = 100.0 },
 				when: _ => false)  // Never execute
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var order = rawConn.QuerySingleOrDefault<OrderDto>(
 			"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 			new { Id = orderId });
-		Assert.IsNull(order, "Insert should have been skipped");
+		order.Should().BeNull("Insert should have been skipped");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ThenInsertIfAsync_WithWhenBasedOnValue_ConditionallExecutes() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1756,17 +1755,17 @@ public sealed class SqliteIntegrationTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				user => new { Id = orderId, UserId = user.Id, Amount = 100.0 },
 				when: user => user.Name == "Admin")  // Only for Admin users
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var order = rawConn.QuerySingleOrDefault<OrderDto>(
 			"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 			new { Id = orderId });
-		Assert.IsNull(order, "Insert should have been skipped because user is not Admin");
+		order.Should().BeNull("Insert should have been skipped because user is not Admin");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ThenInsertIfAsync_Generic_WithWhenFalse_ReturnsResultSelectorValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1788,18 +1787,18 @@ public sealed class SqliteIntegrationTests {
 				user => new { Id = orderId, UserId = user.Id, Amount = 100.0 },
 				when: _ => false,  // Skip insert
 				resultSelector: _ => orderId)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(orderId, result.Value, "Result selector should still be called");
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(orderId, "Result selector should still be called");
 		var order = rawConn.QuerySingleOrDefault<OrderDto>(
 			"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 			new { Id = orderId });
-		Assert.IsNull(order, "Insert should have been skipped");
+		order.Should().BeNull("Insert should have been skipped");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ThenInsertIfAsync_Generic_WithWhenTrue_ExecutesInsertAndTransformsResult() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1821,19 +1820,19 @@ public sealed class SqliteIntegrationTests {
 				user => new { Id = orderId, UserId = user.Id, Amount = 100.0 },
 				when: _ => true,  // Execute insert
 				resultSelector: user => $"Order for {user.Name}")
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("Order for John", result.Value, "Result selector should transform using T value");
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("Order for John", "Result selector should transform using T value");
 		var order = rawConn.QuerySingleOrDefault<OrderDto>(
 			"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 			new { Id = orderId });
-		Assert.IsNotNull(order, "Insert should have been executed");
-		Assert.AreEqual(100.0, order.Amount);
+		order.Should().NotBeNull("Insert should have been executed");
+		order.Amount.Should().Be(100.0);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ThenInsertIfAsync_Generic_WithResultSelector_NextOperationReceivesTransformedType() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1860,17 +1859,17 @@ public sealed class SqliteIntegrationTests {
 				oid => new { Id = oid, Amount = 200.0 },  // oid is string
 				orderId)
 			.ToResult()
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var order = rawConn.QuerySingle<OrderDto>(
 			"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 			new { Id = orderId });
-		Assert.AreEqual(200.0, order.Amount, "Update should have used the transformed orderId");
+		order.Amount.Should().Be(200.0, "Update should have used the transformed orderId");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ThenInsertIfAsync_Generic_WithResultSelector_WhenFalse_NextOperationReceivesTransformedType() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1900,17 +1899,17 @@ public sealed class SqliteIntegrationTests {
 				oid => new { Id = oid, Amount = 300.0 },
 				orderId)
 			.ToResult()
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var order = rawConn.QuerySingle<OrderDto>(
 			"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 			new { Id = orderId });
-		Assert.AreEqual(300.0, order.Amount, "Update should have used the transformed orderId even when insert was skipped");
+		order.Amount.Should().Be(300.0, "Update should have used the transformed orderId even when insert was skipped");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ThenUpdateIfAsync_WithWhenFalse_SkipsUpdate() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1931,17 +1930,17 @@ public sealed class SqliteIntegrationTests {
 				user => new { user.Id, Name = "UpdatedName" },
 				userId,
 				when: _ => false)  // Never execute
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var user = rawConn.QuerySingle<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.AreEqual("John", user.Name, "Update should have been skipped");
+		user.Name.Should().Be("John", "Update should have been skipped");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ThenUpdateIfAsync_WithWhenAndResultSelectorFalse_SkipsUpdate() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1964,17 +1963,17 @@ public sealed class SqliteIntegrationTests {
 				userId,
 				when: _ => false,  // Never execute
 				resultSelector: user => new UserLight(user.Id, user.Name))
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var user = rawConn.QuerySingle<UserLight>(
 			"SELECT Id, Name FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.AreEqual("John", user.Name, "Update should have been skipped");
+		user.Name.Should().Be("John", "Update should have been skipped");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ThenUpdateIfAsync_WithWhenTrue_ExecutesUpdate() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -1995,17 +1994,17 @@ public sealed class SqliteIntegrationTests {
 				user => new { user.Id, Name = "UpdatedName" },
 				userId,
 				when: _ => true)  // Always execute
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var user = rawConn.QuerySingle<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.AreEqual("UpdatedName", user.Name);
+		user.Name.Should().Be("UpdatedName");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ThenUpdateIfAsync_WithWhenAndResultSelectorTrue_ExecutesUpdate() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2027,17 +2026,17 @@ public sealed class SqliteIntegrationTests {
 				userId,
 				when: _ => true,  // Always execute
 				resultSelector: user => new UserLight(user.Id, user.Name))
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var user = rawConn.QuerySingle<UserLight>(
 			"SELECT Id, Name FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.AreEqual("UpdatedName", user.Name);
+		user.Name.Should().Be("UpdatedName");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ThenDeleteIfAsync_WithWhenFalse_SkipsDelete() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2058,17 +2057,17 @@ public sealed class SqliteIntegrationTests {
 				user => new { user.Id },
 				userId,
 				when: _ => false)  // Never execute
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var user = rawConn.QuerySingleOrDefault<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.IsNotNull(user, "Delete should have been skipped");
+		user.Should().NotBeNull("Delete should have been skipped");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ThenDeleteIfAsync_WithWhenTrue_ExecutesDelete() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2089,17 +2088,17 @@ public sealed class SqliteIntegrationTests {
 				user => new { user.Id },
 				userId,
 				when: _ => true)  // Always execute
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var user = rawConn.QuerySingleOrDefault<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.IsNull(user, "User should be deleted");
+		user.Should().BeNull("User should be deleted");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ConditionalOperations_ChainedWithMultipleConditions_ExecutesCorrectly() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2126,27 +2125,27 @@ public sealed class SqliteIntegrationTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				_ => new { Id = orderId2, UserId = userId, Amount = 200.0 },
 				when: _ => false)  // Should skip, UserDto passes through
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 
 		var order1 = rawConn.QuerySingleOrDefault<OrderDto>(
 			"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 			new { Id = orderId1 });
-		Assert.IsNotNull(order1, "First order should be inserted (Admin user)");
+		order1.Should().NotBeNull("First order should be inserted (Admin user)");
 
 		var order2 = rawConn.QuerySingleOrDefault<OrderDto>(
 			"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 			new { Id = orderId2 });
-		Assert.IsNull(order2, "Second order should be skipped");
+		order2.Should().BeNull("Second order should be skipped");
 	}
 
 	#endregion
 
 	#region Non-Generic Conditional Operations (when: Func<bool>)
 
-	[TestMethod]
+	[Fact]
 	public async Task NonGenericDbResult_ThenInsertIfAsync_WithWhenTrue_ExecutesInsert() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2168,15 +2167,15 @@ public sealed class SqliteIntegrationTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				() => new { Id = orderId, UserId = userId, Amount = 100.0 },
 				when: () => shouldInsert)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var count = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE UserId = @UserId", new { UserId = userId });
-		Assert.AreEqual(2L, count, "Both orders should be inserted");
+		count.Should().Be(2L, "Both orders should be inserted");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task NonGenericDbResult_ThenInsertIfAsync_WithWhenFalse_SkipsInsert() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2198,15 +2197,15 @@ public sealed class SqliteIntegrationTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				() => new { Id = orderId, UserId = userId, Amount = 100.0 },
 				when: () => shouldInsert)  // External value
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var count = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE UserId = @UserId", new { UserId = userId });
-		Assert.AreEqual(1L, count, "Only first order should be inserted");
+		count.Should().Be(1L, "Only first order should be inserted");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task NonGenericDbResult_ThenInsertIfAsyncWithResultSelector_WithWhenFalse_SkipsButReturnsValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2229,18 +2228,18 @@ public sealed class SqliteIntegrationTests {
 				() => new { Id = orderId, UserId = userId, Amount = 100.0 },
 				when: () => shouldInsert,
 				resultSelector: () => orderId)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(orderId, result.Value, "Result selector should still return value");
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(orderId, "Result selector should still return value");
 		var order = rawConn.QuerySingleOrDefault<OrderDto>(
 			"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 			new { Id = orderId });
-		Assert.IsNull(order, "Second insert should have been skipped");
+		order.Should().BeNull("Second insert should have been skipped");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task NonGenericDbResult_ThenInsertIfAsyncWithResultSelector_WithWhenTrue_ExecutesInsertAndReturnsValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2261,19 +2260,19 @@ public sealed class SqliteIntegrationTests {
 				() => new { Id = orderId, UserId = userId, Amount = 100.0 },
 				when: () => true,
 				resultSelector: () => $"Created order {orderId}")
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual($"Created order {orderId}", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be($"Created order {orderId}");
 		var order = rawConn.QuerySingleOrDefault<OrderDto>(
 			"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 			new { Id = orderId });
-		Assert.IsNotNull(order, "Second insert should have been executed");
-		Assert.AreEqual(100.0, order.Amount);
+		order.Should().NotBeNull("Second insert should have been executed");
+		order.Amount.Should().Be(100.0);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task NonGenericDbResult_ThenUpdateIfAsyncWithResultSelector_WithWhenFalse_SkipsButReturnsValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2294,18 +2293,18 @@ public sealed class SqliteIntegrationTests {
 				userId,
 				when: () => false,
 				resultSelector: () => $"User {userId}")
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual($"User {userId}", result.Value, "Result selector should return value even when skipped");
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be($"User {userId}", "Result selector should return value even when skipped");
 		var user = rawConn.QuerySingle<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.AreEqual("John", user.Name, "Update should have been skipped");
+		user.Name.Should().Be("John", "Update should have been skipped");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task NonGenericDbResult_ThenUpdateIfAsyncWithResultSelector_WithWhenTrue_ExecutesUpdateAndReturnsValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2326,18 +2325,18 @@ public sealed class SqliteIntegrationTests {
 				userId,
 				when: () => true,
 				resultSelector: () => $"Updated user {userId}")
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual($"Updated user {userId}", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be($"Updated user {userId}");
 		var user = rawConn.QuerySingle<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.AreEqual("UpdatedName", user.Name, "Update should have been executed");
+		user.Name.Should().Be("UpdatedName", "Update should have been executed");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task NonGenericDbResult_ThenUpdateIfAsync_WithWhenFalse_SkipsUpdate() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2359,17 +2358,17 @@ public sealed class SqliteIntegrationTests {
 				() => new { Id = userId, Name = "UpdatedName" },
 				userId,
 				when: () => shouldUpdate)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var user = rawConn.QuerySingle<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.AreEqual("John", user.Name, "Update should have been skipped");
+		user.Name.Should().Be("John", "Update should have been skipped");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task NonGenericDbResult_ThenUpdateIfAsync_WithWhenTrue_ExecutesUpdate() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2391,17 +2390,17 @@ public sealed class SqliteIntegrationTests {
 				() => new { Id = userId, Name = "UpdatedName" },
 				userId,
 				when: () => shouldUpdate)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var user = rawConn.QuerySingle<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.AreEqual("UpdatedName", user.Name);
+		user.Name.Should().Be("UpdatedName");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task NonGenericDbResult_ThenDeleteIfAsync_WithWhenFalse_SkipsDelete() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2423,17 +2422,17 @@ public sealed class SqliteIntegrationTests {
 				() => new { Id = userId },
 				userId,
 				when: () => shouldDelete)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var user = rawConn.QuerySingleOrDefault<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.IsNotNull(user, "Delete should have been skipped");
+		user.Should().NotBeNull("Delete should have been skipped");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task NonGenericDbResult_ThenDeleteIfAsync_WithWhenTrue_ExecutesDelete() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2456,17 +2455,17 @@ public sealed class SqliteIntegrationTests {
 				() => new { Id = orderId },
 				orderId,
 				when: () => shouldDelete)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var order = rawConn.QuerySingleOrDefault<OrderDto>(
 			"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 			new { Id = orderId });
-		Assert.IsNull(order, "Order should be deleted");
+		order.Should().BeNull("Order should be deleted");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task NonGenericDbResult_ChainedConditionalOperations_HandlerScenario() {
 		// Arrange - This simulates the Handler scenario where incoming request has a bool
 		var (conn, rawConn) = CreateConnection();
@@ -2490,15 +2489,15 @@ public sealed class SqliteIntegrationTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				() => new { Id = auditId, UserId = userId, Amount = 0.0 },  // Using Orders as "audit log" for simplicity
 				when: () => request.ShouldAudit)  // Closure captures external value
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var count = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE UserId = @UserId", new { UserId = userId });
-		Assert.AreEqual(2L, count, "Both order and audit should be inserted");
+		count.Should().Be(2L, "Both order and audit should be inserted");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task NonGenericDbResult_ChainedConditionalOperations_HandlerScenario_WhenFalse() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2522,15 +2521,15 @@ public sealed class SqliteIntegrationTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				() => new { Id = auditId, UserId = userId, Amount = 0.0 },
 				when: () => request.ShouldAudit)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var count = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE UserId = @UserId", new { UserId = userId });
-		Assert.AreEqual(1L, count, "Only order should be inserted, audit skipped");
+		count.Should().Be(1L, "Only order should be inserted, audit skipped");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ThenUpdateIfAsync_Generic_WithResultSelector_WhenTrue_NextOperationReceivesTransformedType() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2560,17 +2559,17 @@ public sealed class SqliteIntegrationTests {
 				oid => new { Id = oid, Amount = 600.0 },
 				orderId)
 			.ToResult()
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var order = rawConn.QuerySingle<OrderDto>(
 			"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 			new { Id = orderId });
-		Assert.AreEqual(600.0, order.Amount, "Second update should have used the transformed orderId");
+		order.Amount.Should().Be(600.0, "Second update should have used the transformed orderId");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ThenUpdateIfAsync_Generic_WithResultSelector_WhenFalse_NextOperationReceivesTransformedType() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2600,21 +2599,21 @@ public sealed class SqliteIntegrationTests {
 				oid => new { Id = oid, Amount = 700.0 },
 				orderId)
 			.ToResult()
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var order = rawConn.QuerySingle<OrderDto>(
 			"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 			new { Id = orderId });
-		Assert.AreEqual(700.0, order.Amount, "Second update should have used the transformed orderId even when first update was skipped");
+		order.Amount.Should().Be(700.0, "Second update should have used the transformed orderId even when first update was skipped");
 	}
 
 	#endregion
 
 	#region TransactionContext CUDIfAsync Methods
 
-	[TestMethod]
+	[Fact]
 	public async Task InsertIfAsync_WithWhenTrue_ExecutesInsert() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2629,18 +2628,18 @@ public sealed class SqliteIntegrationTests {
 				"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 				() => new { Id = userId, Name = "John", Email = "john@test.com" },
 				when: () => shouldInsert)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var user = rawConn.QuerySingleOrDefault<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.IsNotNull(user);
-		Assert.AreEqual("John", user.Name);
+		user.Should().NotBeNull();
+		user.Name.Should().Be("John");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task InsertIfAsync_WithWhenFalse_SkipsInsert() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2655,17 +2654,17 @@ public sealed class SqliteIntegrationTests {
 				"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 				() => new { Id = userId, Name = "John", Email = "john@test.com" },
 				when: () => shouldInsert)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess, "Result should be successful even when insert is skipped");
+		result.IsSuccess.Should().BeTrue("Result should be successful even when insert is skipped");
 		var user = rawConn.QuerySingleOrDefault<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.IsNull(user, "Insert should have been skipped");
+		user.Should().BeNull("Insert should have been skipped");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task InsertIfAsync_WithoutParameters_WithWhenTrue_ExecutesInsert() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2679,17 +2678,17 @@ public sealed class SqliteIntegrationTests {
 			ctx.InsertIfAsync(
 				$"INSERT INTO Users (Id, Name, Email) VALUES ('{userId}', 'John', 'john@test.com')",
 				when: () => shouldInsert)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var user = rawConn.QuerySingleOrDefault<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.IsNotNull(user);
+		user.Should().NotBeNull();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task InsertIfAndReturnAsync_WithWhenTrue_ExecutesInsertAndReturnsValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2705,18 +2704,18 @@ public sealed class SqliteIntegrationTests {
 				() => new { Id = userId, Name = "John", Email = "john@test.com" },
 				resultSelector: () => userId,
 				when: () => shouldInsert)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(userId, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(userId);
 		var user = rawConn.QuerySingleOrDefault<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.IsNotNull(user);
+		user.Should().NotBeNull();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task InsertIfAndReturnAsync_WithWhenFalse_SkipsInsertButReturnsValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2732,18 +2731,18 @@ public sealed class SqliteIntegrationTests {
 				() => new { Id = userId, Name = "John", Email = "john@test.com" },
 				resultSelector: () => "skipped",
 				when: () => shouldInsert)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("skipped", result.Value, "Result selector should still be called when insert is skipped");
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("skipped", "Result selector should still be called when insert is skipped");
 		var user = rawConn.QuerySingleOrDefault<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.IsNull(user, "Insert should have been skipped");
+		user.Should().BeNull("Insert should have been skipped");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task UpdateIfAsync_WithWhenTrue_ExecutesUpdate() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2761,17 +2760,17 @@ public sealed class SqliteIntegrationTests {
 				() => new { Id = userId, Name = "Jane" },
 				key: userId,
 				when: () => shouldUpdate)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var user = rawConn.QuerySingle<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.AreEqual("Jane", user.Name);
+		user.Name.Should().Be("Jane");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task UpdateIfAsync_WithWhenFalse_SkipsUpdate() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2789,17 +2788,17 @@ public sealed class SqliteIntegrationTests {
 				() => new { Id = userId, Name = "Jane" },
 				key: userId,
 				when: () => shouldUpdate)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess, "Result should be successful even when update is skipped");
+		result.IsSuccess.Should().BeTrue("Result should be successful even when update is skipped");
 		var user = rawConn.QuerySingle<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.AreEqual("John", user.Name, "Name should not have changed");
+		user.Name.Should().Be("John", "Name should not have changed");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task UpdateIfAndReturnAsync_WithWhenTrue_ExecutesUpdateAndReturnsValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2818,18 +2817,18 @@ public sealed class SqliteIntegrationTests {
 				key: userId,
 				resultSelector: () => "updated",
 				when: () => shouldUpdate)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("updated", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("updated");
 		var user = rawConn.QuerySingle<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.AreEqual("Jane", user.Name);
+		user.Name.Should().Be("Jane");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task UpdateIfAndReturnAsync_WithWhenFalse_SkipsUpdateButReturnsValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2848,18 +2847,18 @@ public sealed class SqliteIntegrationTests {
 				key: userId,
 				resultSelector: () => "skipped",
 				when: () => shouldUpdate)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("skipped", result.Value, "Result selector should still be called when update is skipped");
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("skipped", "Result selector should still be called when update is skipped");
 		var user = rawConn.QuerySingle<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.AreEqual("John", user.Name, "Name should not have changed");
+		user.Name.Should().Be("John", "Name should not have changed");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DeleteIfAsync_WithWhenTrue_ExecutesDelete() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2877,17 +2876,17 @@ public sealed class SqliteIntegrationTests {
 				() => new { Id = userId },
 				key: userId,
 				when: () => shouldDelete)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var user = rawConn.QuerySingleOrDefault<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.IsNull(user, "User should have been deleted");
+		user.Should().BeNull("User should have been deleted");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DeleteIfAsync_WithWhenFalse_SkipsDelete() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2905,17 +2904,17 @@ public sealed class SqliteIntegrationTests {
 				() => new { Id = userId },
 				key: userId,
 				when: () => shouldDelete)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess, "Result should be successful even when delete is skipped");
+		result.IsSuccess.Should().BeTrue("Result should be successful even when delete is skipped");
 		var user = rawConn.QuerySingleOrDefault<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.IsNotNull(user, "User should still exist");
+		user.Should().NotBeNull("User should still exist");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task InsertIfAsync_CanChainWithOtherOperations() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2934,21 +2933,21 @@ public sealed class SqliteIntegrationTests {
 			.ThenInsertAsync(
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				new { Id = orderId, UserId = userId, Amount = 100.0 })
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var user = rawConn.QuerySingleOrDefault<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.IsNotNull(user);
+		user.Should().NotBeNull();
 		var order = rawConn.QuerySingleOrDefault<OrderDto>(
 			"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 			new { Id = orderId });
-		Assert.IsNotNull(order);
+		order.Should().NotBeNull();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task InsertIfAsync_WhenSkipped_CanStillChainWithOtherOperations() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -2971,26 +2970,26 @@ public sealed class SqliteIntegrationTests {
 			.ThenInsertAsync(
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				new { Id = orderId, UserId = userId, Amount = 100.0 })
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		// The conditional user should not exist
 		var jane = rawConn.QuerySingleOrDefault<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Name = 'Jane'");
-		Assert.IsNull(jane, "Conditional insert should have been skipped");
+		jane.Should().BeNull("Conditional insert should have been skipped");
 		// But the order should exist
 		var order = rawConn.QuerySingleOrDefault<OrderDto>(
 			"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 			new { Id = orderId });
-		Assert.IsNotNull(order, "Chain should continue after skipped insert");
+		order.Should().NotBeNull("Chain should continue after skipped insert");
 	}
 
 	#endregion
 
 	#region InsertAndGet
 
-	[TestMethod]
+	[Fact]
 	public async Task InsertAndGetAsync_WhenSuccessful_ReturnsInsertedRow() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -3005,16 +3004,16 @@ public sealed class SqliteIntegrationTests {
 			SELECT Id, Name, Email FROM Users WHERE Id = @Id;
 			""",
 			new { Id = userId, Name = "John", Email = "john@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(userId, result.Value.Id);
-		Assert.AreEqual("John", result.Value.Name);
-		Assert.AreEqual("john@test.com", result.Value.Email);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Id.Should().Be(userId);
+		result.Value.Name.Should().Be("John");
+		result.Value.Email.Should().Be("john@test.com");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task InsertAndGetAsync_WithMapper_TransformsResult() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -3030,14 +3029,14 @@ public sealed class SqliteIntegrationTests {
 			""",
 			new { Id = userId, Name = "Jane", Email = "jane@test.com" },
 			dto => new User(dto.Id, dto.Name, dto.Email),
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("Jane", result.Value.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Name.Should().Be("Jane");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task InsertAndGetAsync_WhenUniqueConstraintViolation_ReturnsAlreadyExists() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -3055,15 +3054,15 @@ public sealed class SqliteIntegrationTests {
 			""",
 			new { Id = Guid.NewGuid().ToString(), Name = "Jane", Email = "john@test.com" },
 			uniqueConstraintMessage: "User with this email already exists",
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<AlreadyExistsException>(result.Error);
-		Assert.AreEqual("User with this email already exists", result.Error.Message);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<AlreadyExistsException>();
+		result.Error.Message.Should().Be("User with this email already exists");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task InsertAndGetOptionalAsync_WhenConditionalInsertSucceeds_ReturnsRow() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -3081,14 +3080,14 @@ public sealed class SqliteIntegrationTests {
 			""",
 			new { Id = userId, Name = "John", Email = "john@test.com" },
 			opt => opt.HasValue ? $"Created: {opt.Value.Name}" : "Already exists",
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("Created: John", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("Created: John");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task InsertAndGetOptionalAsync_WhenConditionalInsertSkipped_ReturnsNone() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -3110,18 +3109,18 @@ public sealed class SqliteIntegrationTests {
 			""",
 			new { Id = newUserId, Name = "Jane", Email = "john@test.com" },
 			opt => opt.HasValue ? $"Created: {opt.Value.Name}" : "Already exists",
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("Already exists", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("Already exists");
 	}
 
 	#endregion
 
 	#region UpdateAndGet
 
-	[TestMethod]
+	[Fact]
 	public async Task UpdateAndGetAsync_WhenSuccessful_ReturnsUpdatedRow() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -3139,16 +3138,16 @@ public sealed class SqliteIntegrationTests {
 			""",
 			new { Id = userId, Name = "Johnny" },
 			key: userId,
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(userId, result.Value.Id);
-		Assert.AreEqual("Johnny", result.Value.Name);
-		Assert.AreEqual("john@test.com", result.Value.Email);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Id.Should().Be(userId);
+		result.Value.Name.Should().Be("Johnny");
+		result.Value.Email.Should().Be("john@test.com");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task UpdateAndGetAsync_WhenRecordNotFound_ReturnsNotFound() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -3164,14 +3163,14 @@ public sealed class SqliteIntegrationTests {
 			""",
 			new { Id = nonExistentId, Name = "Johnny" },
 			key: nonExistentId,
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<NotFoundException>(result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<NotFoundException>();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task UpdateAndGetAsync_WithMapper_TransformsResult() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -3190,14 +3189,14 @@ public sealed class SqliteIntegrationTests {
 			new { Id = userId, Name = "Johnny" },
 			key: userId,
 			dto => new UserLight(dto.Id, dto.Name),
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("Johnny", result.Value.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Name.Should().Be("Johnny");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task UpdateAndGetAsync_WhenUniqueConstraintViolation_ReturnsAlreadyExists() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -3219,15 +3218,15 @@ public sealed class SqliteIntegrationTests {
 			new { Id = userId2, Email = "john@test.com" },
 			key: userId2,
 			uniqueConstraintMessage: "Email already in use",
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<AlreadyExistsException>(result.Error);
-		Assert.AreEqual("Email already in use", result.Error.Message);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<AlreadyExistsException>();
+		result.Error.Message.Should().Be("Email already in use");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task UpdateAndGetOptionalAsync_WhenConditionalUpdateSucceeds_ReturnsRow() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -3245,18 +3244,18 @@ public sealed class SqliteIntegrationTests {
 			""",
 			new { Id = userId, Name = "Johnny" },
 			opt => opt.HasValue ? $"Updated: {opt.Value.Name}" : "Not updated",
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("Updated: Johnny", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("Updated: Johnny");
 	}
 
 	#endregion
 
 	#region DeleteAndGet
 
-	[TestMethod]
+	[Fact]
 	public async Task DeleteAndGetAsync_WhenSuccessful_ReturnsDeletedRow() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -3274,19 +3273,19 @@ public sealed class SqliteIntegrationTests {
 			""",
 			new { Id = userId },
 			key: userId,
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(userId, result.Value.Id);
-		Assert.AreEqual("John", result.Value.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Id.Should().Be(userId);
+		result.Value.Name.Should().Be("John");
 
 		// Verify deleted
 		var count = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual(0L, count);
+		count.Should().Be(0L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DeleteAndGetAsync_WhenRecordNotFound_ReturnsNotFound() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -3302,14 +3301,14 @@ public sealed class SqliteIntegrationTests {
 			""",
 			new { Id = nonExistentId },
 			key: nonExistentId,
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<NotFoundException>(result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<NotFoundException>();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DeleteAndGetAsync_WithMapper_TransformsResult() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -3328,18 +3327,18 @@ public sealed class SqliteIntegrationTests {
 			new { Id = userId },
 			key: userId,
 			dto => $"Deleted user: {dto.Name}",
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("Deleted user: John", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("Deleted user: John");
 	}
 
 	#endregion
 
 	#region InsertAndGet/UpdateAndGet/DeleteAndGet Chaining
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_GetThenInsertAndGet_ReturnsInsertedRow() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -3363,16 +3362,16 @@ public sealed class SqliteIntegrationTests {
 				SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id;
 				""",
 				user => new { Id = orderId, UserId = user.Id, Amount = 99.99 })
-			, this.TestContext.CancellationToken);
+			, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(orderId, result.Value.Id);
-		Assert.AreEqual(userId, result.Value.UserId);
-		Assert.AreEqual(99.99, result.Value.Amount);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Id.Should().Be(orderId);
+		result.Value.UserId.Should().Be(userId);
+		result.Value.Amount.Should().Be(99.99);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_InsertAndGetThenUpdateAndGet_ChainsOperations() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -3399,15 +3398,15 @@ public sealed class SqliteIntegrationTests {
 				""",
 				order => new { Id = order.Id, Amount = order.Amount * 2 },
 				order => order.Id)
-			, this.TestContext.CancellationToken);
+			, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(orderId, result.Value.Id);
-		Assert.AreEqual(100.0, result.Value.Amount); // 50 * 2
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Id.Should().Be(orderId);
+		result.Value.Amount.Should().Be(100.0); // 50 * 2
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_GetThenInsertAndGetThenDelete_FullChain() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -3438,19 +3437,19 @@ public sealed class SqliteIntegrationTests {
 				""",
 				order => new { Id = order.Id },
 				order => order.Id)
-			, this.TestContext.CancellationToken);
+			, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(orderId, result.Value.Id);
-		Assert.AreEqual(75.0, result.Value.Amount);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Id.Should().Be(orderId);
+		result.Value.Amount.Should().Be(75.0);
 
 		// Verify deleted
 		var count = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { Id = orderId });
-		Assert.AreEqual(0L, count);
+		count.Should().Be(0L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_WhenFirstStepFails_SubsequentStepsSkipped() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -3471,18 +3470,18 @@ public sealed class SqliteIntegrationTests {
 				SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id;
 				""",
 				user => new { Id = orderId, UserId = user.Id, Amount = 100.0 })
-			, this.TestContext.CancellationToken);
+			, CancellationToken.None);
 
 		// Assert - Should fail with NotFoundException from the first step
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<NotFoundException>(result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<NotFoundException>();
 
 		// Verify order was NOT inserted (chain short-circuited)
 		var count = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { Id = orderId });
-		Assert.AreEqual(0L, count);
+		count.Should().Be(0L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_WhenMiddleStepFails_TransactionRolledBack() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -3510,18 +3509,18 @@ public sealed class SqliteIntegrationTests {
 				""",
 				_ => new { Id = nonExistentOrderId, Amount = 999.0 },
 				_ => nonExistentOrderId)
-			, this.TestContext.CancellationToken);
+			, CancellationToken.None);
 
 		// Assert - Should fail with NotFoundException from the second step
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<NotFoundException>(result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<NotFoundException>();
 
 		// Verify order was rolled back (transaction failed)
 		var count = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { Id = orderId });
-		Assert.AreEqual(0L, count);
+		count.Should().Be(0L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChaining_ThenInsertAndGetOptional_HandlesEmptyCase() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -3553,11 +3552,11 @@ public sealed class SqliteIntegrationTests {
 				""",
 				user => new { Id = newOrderId, UserId = user.Id, Amount = 200.0 },
 				opt => opt.HasValue ? $"Created order: {opt.Value.Id}" : "User already has an order")
-			, this.TestContext.CancellationToken);
+			, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("User already has an order", result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be("User already has an order");
 	}
 
 	#endregion
@@ -3568,8 +3567,6 @@ public sealed class SqliteIntegrationTests {
 	private record User(string Id, string Name, string Email);
 	private record UserLight(string Id, string Name);
 	private record OrderDto(string Id, string UserId, double Amount);
-
-	public TestContext TestContext { get; set; }
 
 	#endregion
 

@@ -1,11 +1,10 @@
-namespace Cirreum.Persistence.Sql.Test;
+namespace Cirreum.Persistence.Sql.Tests;
 
 using Cirreum;
 using Cirreum.Persistence;
 using Dapper;
 using Microsoft.Data.Sqlite;
 
-[TestClass]
 public sealed class CommandWithCountAsyncTests {
 
 	private static (ISqlConnection conn, SqliteConnection rawConn) CreateConnection() {
@@ -35,7 +34,7 @@ public sealed class CommandWithCountAsyncTests {
 
 	#region InsertWithCountAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task InsertWithCountAsync_ReturnsRowCount_WhenInsertSucceeds() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -48,14 +47,14 @@ public sealed class CommandWithCountAsyncTests {
 		var result = await conn.InsertWithCountAsync(
 			"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 			new { Id = userId, Name = "John", Email = "john@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task InsertWithCountAsync_ReturnsZero_WhenConditionalInsertMatchesNothing() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -76,14 +75,14 @@ public sealed class CommandWithCountAsyncTests {
 			WHERE NOT EXISTS (SELECT 1 FROM Users WHERE Email = @Email)
 			""",
 			new { Id = Guid.NewGuid().ToString(), Name = "Jane", Email = "john@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(0, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(0);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task InsertWithCountAsync_ReturnsOne_WhenConditionalInsertSucceeds() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -98,18 +97,18 @@ public sealed class CommandWithCountAsyncTests {
 			WHERE NOT EXISTS (SELECT 1 FROM Users WHERE Email = @Email)
 			""",
 			new { Id = Guid.NewGuid().ToString(), Name = "Jane", Email = "jane@test.com" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1);
 	}
 
 	#endregion
 
 	#region UpdateWithCountAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task UpdateWithCountAsync_ReturnsRowCount_WhenUpdateSucceeds() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -125,14 +124,14 @@ public sealed class CommandWithCountAsyncTests {
 		var result = await conn.UpdateWithCountAsync(
 			"UPDATE Users SET Name = @Name WHERE Id = @Id",
 			new { Id = userId, Name = "Johnny" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task UpdateWithCountAsync_ReturnsZero_WhenNoRowsMatch() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -143,14 +142,14 @@ public sealed class CommandWithCountAsyncTests {
 		var result = await conn.UpdateWithCountAsync(
 			"UPDATE Users SET Name = @Name WHERE Id = @Id",
 			new { Id = Guid.NewGuid().ToString(), Name = "Johnny" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(0, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(0);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task UpdateWithCountAsync_ReturnsMultiple_WhenMultipleRowsMatch() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -168,18 +167,18 @@ public sealed class CommandWithCountAsyncTests {
 		var result = await conn.UpdateWithCountAsync(
 			"UPDATE Users SET Name = @NewName WHERE Name = @OldName",
 			new { OldName = "John", NewName = "Johnny" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(2, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(2);
 	}
 
 	#endregion
 
 	#region DeleteWithCountAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task DeleteWithCountAsync_ReturnsRowCount_WhenDeleteSucceeds() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -195,14 +194,14 @@ public sealed class CommandWithCountAsyncTests {
 		var result = await conn.DeleteWithCountAsync(
 			"DELETE FROM Users WHERE Id = @Id",
 			new { Id = userId },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DeleteWithCountAsync_ReturnsZero_WhenNoRowsMatch() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -213,14 +212,14 @@ public sealed class CommandWithCountAsyncTests {
 		var result = await conn.DeleteWithCountAsync(
 			"DELETE FROM Users WHERE Id = @Id",
 			new { Id = Guid.NewGuid().ToString() },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(0, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(0);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DeleteWithCountAsync_ReturnsMultiple_WhenMultipleRowsMatch() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -238,18 +237,18 @@ public sealed class CommandWithCountAsyncTests {
 		var result = await conn.DeleteWithCountAsync(
 			"DELETE FROM Users WHERE Name = @Name",
 			new { Name = "John" },
-			cancellationToken: this.TestContext.CancellationToken);
+			cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(2, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(2);
 	}
 
 	#endregion
 
 	#region DbContext Integration
 
-	[TestMethod]
+	[Fact]
 	public async Task DbContext_InsertWithCountAsync_Works() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -262,14 +261,14 @@ public sealed class CommandWithCountAsyncTests {
 		var result = await conn.ExecuteAsync<int>(ctx =>
 			ctx.InsertWithCountAsync(
 				"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
-				new { Id = userId, Name = "John", Email = "john@test.com" }), this.TestContext.CancellationToken);
+				new { Id = userId, Name = "John", Email = "john@test.com" }), CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbContext_UpdateWithCountAsync_Works() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -285,14 +284,14 @@ public sealed class CommandWithCountAsyncTests {
 		var result = await conn.ExecuteAsync<int>(ctx =>
 			ctx.UpdateWithCountAsync(
 				"UPDATE Users SET Name = @Name WHERE Id = @Id",
-				new { Id = userId, Name = "Johnny" }), this.TestContext.CancellationToken);
+				new { Id = userId, Name = "Johnny" }), CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbContext_DeleteWithCountAsync_Works() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -308,18 +307,18 @@ public sealed class CommandWithCountAsyncTests {
 		var result = await conn.ExecuteAsync<int>(ctx =>
 			ctx.DeleteWithCountAsync(
 				"DELETE FROM Users WHERE Id = @Id",
-				new { Id = userId }), this.TestContext.CancellationToken);
+				new { Id = userId }), CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1);
 	}
 
 	#endregion
 
 	#region Chaining (ThenXxxWithCountAsync)
 
-	[TestMethod]
+	[Fact]
 	public async Task ThenInsertWithCountAsync_ChainsCorrectly() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -339,18 +338,18 @@ public sealed class CommandWithCountAsyncTests {
 				userId)
 			.ThenInsertWithCountAsync(
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
-				user => new { Id = Guid.NewGuid().ToString(), UserId = user.Id, Amount = 100.0 }), this.TestContext.CancellationToken);
+				user => new { Id = Guid.NewGuid().ToString(), UserId = user.Id, Amount = 100.0 }), CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1);
 
 		// Verify order was inserted
 		var orderCount = rawConn.ExecuteScalar<int>("SELECT COUNT(*) FROM Orders WHERE UserId = @UserId", new { UserId = userId });
-		Assert.AreEqual(1, orderCount);
+		orderCount.Should().Be(1);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ThenUpdateWithCountAsync_ChainsCorrectly() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -370,18 +369,18 @@ public sealed class CommandWithCountAsyncTests {
 				userId)
 			.ThenUpdateWithCountAsync(
 				"UPDATE Users SET Name = @Name WHERE Id = @Id",
-				user => new { user.Id, Name = "Johnny" }), this.TestContext.CancellationToken);
+				user => new { user.Id, Name = "Johnny" }), CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1);
 
 		// Verify update
 		var updatedName = rawConn.ExecuteScalar<string>("SELECT Name FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual("Johnny", updatedName);
+		updatedName.Should().Be("Johnny");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ThenDeleteWithCountAsync_ChainsCorrectly() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -405,18 +404,18 @@ public sealed class CommandWithCountAsyncTests {
 				userId)
 			.ThenDeleteWithCountAsync(
 				"DELETE FROM Orders WHERE UserId = @UserId",
-				user => new { UserId = user.Id }), this.TestContext.CancellationToken);
+				user => new { UserId = user.Id }), CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1);
 
 		// Verify deletion
 		var orderCount = rawConn.ExecuteScalar<int>("SELECT COUNT(*) FROM Orders WHERE UserId = @UserId", new { UserId = userId });
-		Assert.AreEqual(0, orderCount);
+		orderCount.Should().Be(0);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ThenUpdateWithCountAsync_ReturnsZero_WhenNoRowsMatch() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -436,18 +435,18 @@ public sealed class CommandWithCountAsyncTests {
 				userId)
 			.ThenUpdateWithCountAsync(
 				"UPDATE Users SET Name = @Name WHERE Id = @NonExistentId",
-				new { NonExistentId = Guid.NewGuid().ToString(), Name = "Johnny" }), this.TestContext.CancellationToken);
+				new { NonExistentId = Guid.NewGuid().ToString(), Name = "Johnny" }), CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(0, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(0);
 	}
 
 	#endregion
 
 	#region Transaction Integration
 
-	[TestMethod]
+	[Fact]
 	public async Task InsertWithCountAsync_WorksInTransaction() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -460,18 +459,18 @@ public sealed class CommandWithCountAsyncTests {
 		var result = await conn.ExecuteTransactionAsync<int>(ctx =>
 			ctx.InsertWithCountAsync(
 				"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
-				new { Id = userId, Name = "John", Email = "john@test.com" }), this.TestContext.CancellationToken);
+				new { Id = userId, Name = "John", Email = "john@test.com" }), CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1);
 
 		// Verify committed
 		var count = rawConn.ExecuteScalar<int>("SELECT COUNT(*) FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual(1, count);
+		count.Should().Be(1);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ChainedWithCountAsync_RollsBackOnFailure() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -487,21 +486,21 @@ public sealed class CommandWithCountAsyncTests {
 				new { Id = userId, Name = "John", Email = "john@test.com" })
 			.ThenInsertWithCountAsync(
 				"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
-				new { Id = Guid.NewGuid().ToString(), Name = "Jane", Email = "john@test.com" }), this.TestContext.CancellationToken); // Same email!
+				new { Id = Guid.NewGuid().ToString(), Name = "Jane", Email = "john@test.com" }), CancellationToken.None); // Same email!
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
+		result.IsFailure.Should().BeTrue();
 
 		// Verify rollback - first user should NOT exist
 		var count = rawConn.ExecuteScalar<int>("SELECT COUNT(*) FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual(0, count);
+		count.Should().Be(0);
 	}
 
 	#endregion
 
 	#region Non-generic DbResult chaining
 
-	[TestMethod]
+	[Fact]
 	public async Task NonGenericDbResult_ThenInsertWithCountAsync_Works() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -517,14 +516,14 @@ public sealed class CommandWithCountAsyncTests {
 				new { Id = userId, Name = "John", Email = "john@test.com" })
 			.ThenInsertWithCountAsync(
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
-				new { Id = Guid.NewGuid().ToString(), UserId = userId, Amount = 100.0 }), this.TestContext.CancellationToken);
+				new { Id = Guid.NewGuid().ToString(), UserId = userId, Amount = 100.0 }), CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task NonGenericDbResult_ThenUpdateWithCountAsync_Works() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -543,14 +542,14 @@ public sealed class CommandWithCountAsyncTests {
 				new { Id = Guid.NewGuid().ToString(), UserId = userId, Amount = 100.0 })
 			.ThenUpdateWithCountAsync(
 				"UPDATE Users SET Name = @Name WHERE Id = @Id",
-				new { Id = userId, Name = "Johnny" }), this.TestContext.CancellationToken);
+				new { Id = userId, Name = "Johnny" }), CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task NonGenericDbResult_ThenDeleteWithCountAsync_Works() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -574,14 +573,13 @@ public sealed class CommandWithCountAsyncTests {
 				userId)
 			.ThenDeleteWithCountAsync(
 				"DELETE FROM Orders WHERE UserId = @UserId",
-				new { UserId = userId }), this.TestContext.CancellationToken);
+				new { UserId = userId }), CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1);
 	}
 
 	#endregion
 
-	public TestContext TestContext { get; set; }
 }

@@ -1,4 +1,4 @@
-namespace Cirreum.Persistence.Sql.Test;
+namespace Cirreum.Persistence.Sql.Tests;
 
 using Cirreum;
 using Cirreum.Exceptions;
@@ -6,7 +6,6 @@ using Cirreum.Persistence;
 using Dapper;
 using Microsoft.Data.Sqlite;
 
-[TestClass]
 public sealed class QueryMultipleAsyncTests {
 
 	private static (ISqlConnection conn, SqliteConnection rawConn) CreateConnection() {
@@ -38,7 +37,7 @@ public sealed class QueryMultipleAsyncTests {
 
 	#region MultipleGetAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleGetAsync_ReturnsValue_WhenMapperReturnsValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -72,16 +71,16 @@ public sealed class QueryMultipleAsyncTests {
 
 				var orders = (await reader.ReadAsync<OrderDto>()).ToList();
 				return new UserWithOrders(user, orders);
-			}, cancellationToken: this.TestContext.CancellationToken);
+			}, cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("John", result.Value.User.Name);
-		Assert.HasCount(2, result.Value.Orders);
-		Assert.AreEqual(300.0, result.Value.Orders.Sum(o => o.Amount));
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.User.Name.Should().Be("John");
+		result.Value.Orders.Should().HaveCount(2);
+		result.Value.Orders.Sum(o => o.Amount).Should().Be(300.0);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleGetAsync_ReturnsNotFound_WhenMapperReturnsNull() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -106,14 +105,14 @@ public sealed class QueryMultipleAsyncTests {
 
 				var orders = (await reader.ReadAsync<OrderDto>()).ToList();
 				return new UserWithOrders(user, orders);
-			}, cancellationToken: this.TestContext.CancellationToken);
+			}, cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<NotFoundException>(result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<NotFoundException>();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleGetAsync_NoParameters_Works() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -133,14 +132,14 @@ public sealed class QueryMultipleAsyncTests {
 				var userCount = await reader.ReadSingleOrDefaultAsync<int>();
 				var orderCount = await reader.ReadSingleOrDefaultAsync<int>();
 				return userCount + orderCount;
-			}, cancellationToken: this.TestContext.CancellationToken);
+			}, cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(1, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(1);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleGetAsync_MapperThrows_ReturnsFailure() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -154,19 +153,19 @@ public sealed class QueryMultipleAsyncTests {
 			async _ => {
 				await Task.CompletedTask;
 				throw new InvalidOperationException("Mapper error");
-			}, cancellationToken: this.TestContext.CancellationToken);
+			}, cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<InvalidOperationException>(result.Error);
-		Assert.AreEqual("Mapper error", result.Error!.Message);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<InvalidOperationException>();
+		result.Error!.Message.Should().Be("Mapper error");
 	}
 
 	#endregion
 
 	#region MultipleGetOptionalAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleGetOptionalAsync_ReturnsOptionalWithValue_WhenMapperReturnsValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -182,15 +181,15 @@ public sealed class QueryMultipleAsyncTests {
 		var result = await conn.MultipleGetOptionalAsync(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id;",
 			new { Id = userId },
-			async reader => await reader.ReadSingleOrDefaultAsync<UserDto>(), cancellationToken: this.TestContext.CancellationToken);
+			async reader => await reader.ReadSingleOrDefaultAsync<UserDto>(), cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsTrue(result.Value.HasValue);
-		Assert.AreEqual("John", result.Value.Value.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.HasValue.Should().BeTrue();
+		result.Value.Value.Name.Should().Be("John");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleGetOptionalAsync_ReturnsEmptyOptional_WhenMapperReturnsNull() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -203,14 +202,14 @@ public sealed class QueryMultipleAsyncTests {
 		var result = await conn.MultipleGetOptionalAsync(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id;",
 			new { Id = userId },
-			async reader => await reader.ReadSingleOrDefaultAsync<UserDto>(), cancellationToken: this.TestContext.CancellationToken);
+			async reader => await reader.ReadSingleOrDefaultAsync<UserDto>(), cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsFalse(result.Value.HasValue);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.HasValue.Should().BeFalse();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleGetOptionalAsync_NoParameters_Works() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -220,19 +219,19 @@ public sealed class QueryMultipleAsyncTests {
 		// Act
 		var result = await conn.MultipleGetOptionalAsync(
 			"SELECT COUNT(*) FROM Users;",
-			async reader => await reader.ReadSingleOrDefaultAsync<int>(), cancellationToken: this.TestContext.CancellationToken);
+			async reader => await reader.ReadSingleOrDefaultAsync<int>(), cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsTrue(result.Value.HasValue);
-		Assert.AreEqual(0, result.Value.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.HasValue.Should().BeTrue();
+		result.Value.Value.Should().Be(0);
 	}
 
 	#endregion
 
 	#region MultipleQueryAnyAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleQueryAnyAsync_ReturnsList_WhenMapperReturnsList() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -259,14 +258,14 @@ public sealed class QueryMultipleAsyncTests {
 			async reader => {
 				var orders = await reader.ReadAsync<OrderDto>();
 				return [.. orders];
-			}, cancellationToken: this.TestContext.CancellationToken);
+			}, cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.HasCount(2, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().HaveCount(2);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleQueryAnyAsync_ReturnsEmptyList_WhenNoResults() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -282,14 +281,14 @@ public sealed class QueryMultipleAsyncTests {
 			async reader => {
 				var orders = await reader.ReadAsync<OrderDto>();
 				return [.. orders];
-			}, cancellationToken: this.TestContext.CancellationToken);
+			}, cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsEmpty(result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().BeEmpty();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleQueryAnyAsync_ReturnsEmptyList_WhenMapperReturnsNull() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -302,14 +301,14 @@ public sealed class QueryMultipleAsyncTests {
 			async _ => {
 				await Task.CompletedTask;
 				return null;
-			}, cancellationToken: this.TestContext.CancellationToken);
+			}, cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsEmpty(result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().BeEmpty();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleQueryAnyAsync_NoParameters_Works() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -326,18 +325,18 @@ public sealed class QueryMultipleAsyncTests {
 		// Act
 		var result = await conn.MultipleQueryAnyAsync<UserDto>(
 			"SELECT Id, Name, Email FROM Users;",
-			async reader => [.. (await reader.ReadAsync<UserDto>())], cancellationToken: this.TestContext.CancellationToken);
+			async reader => [.. (await reader.ReadAsync<UserDto>())], cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.HasCount(2, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().HaveCount(2);
 	}
 
 	#endregion
 
 	#region DbContext Integration
 
-	[TestMethod]
+	[Fact]
 	public async Task DbContext_MultipleGetAsync_Works() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -355,14 +354,14 @@ public sealed class QueryMultipleAsyncTests {
 				"SELECT Id, Name, Email FROM Users WHERE Id = @Id;",
 				new { Id = userId },
 				[userId],
-				async reader => await reader.ReadSingleOrDefaultAsync<UserDto>()), this.TestContext.CancellationToken);
+				async reader => await reader.ReadSingleOrDefaultAsync<UserDto>()), CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("John", result.Value.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Name.Should().Be("John");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbContext_ThenMultipleGetAsync_ChainsCorrectly() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -398,15 +397,15 @@ public sealed class QueryMultipleAsyncTests {
 
 					var orders = (await reader.ReadAsync<OrderDto>()).ToList();
 					return new UserWithOrders(u, orders);
-				}), this.TestContext.CancellationToken);
+				}), CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("John", result.Value.User.Name);
-		Assert.HasCount(1, result.Value.Orders);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.User.Name.Should().Be("John");
+		result.Value.Orders.Should().HaveCount(1);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbContext_ThenMultipleGetOptionalAsync_ChainsCorrectly() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -427,15 +426,15 @@ public sealed class QueryMultipleAsyncTests {
 			.ThenMultipleGetOptionalAsync(
 				"SELECT Id, Name, Email FROM Users WHERE Email = @Email;",
 				user => new { user.Email },
-				async (_, reader) => await reader.ReadSingleOrDefaultAsync<UserDto>()), this.TestContext.CancellationToken);
+				async (_, reader) => await reader.ReadSingleOrDefaultAsync<UserDto>()), CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsTrue(result.Value.HasValue);
-		Assert.AreEqual("John", result.Value.Value.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.HasValue.Should().BeTrue();
+		result.Value.Value.Name.Should().Be("John");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbContext_ThenMultipleQueryAnyAsync_ChainsCorrectly() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -462,18 +461,18 @@ public sealed class QueryMultipleAsyncTests {
 			.ThenMultipleQueryAnyAsync<OrderDto>(
 				"SELECT Id, UserId, Amount FROM Orders WHERE UserId = @UserId;",
 				user => new { UserId = user.Id },
-				async (_, reader) => [.. (await reader.ReadAsync<OrderDto>())]), this.TestContext.CancellationToken);
+				async (_, reader) => [.. (await reader.ReadAsync<OrderDto>())]), CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.HasCount(2, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().HaveCount(2);
 	}
 
 	#endregion
 
 	#region Transaction Integration
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleGetAsync_WorksInTransaction() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -491,20 +490,18 @@ public sealed class QueryMultipleAsyncTests {
 				"SELECT Id, Name, Email FROM Users WHERE Id = @Id;",
 				new { Id = userId },
 				[userId],
-				async reader => await reader.ReadSingleOrDefaultAsync<UserDto>()), this.TestContext.CancellationToken);
+				async reader => await reader.ReadSingleOrDefaultAsync<UserDto>()), CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("John", result.Value.Name);
+		result.IsSuccess.Should().BeTrue();
+		result.Value!.Name.Should().Be("John");
 	}
-
-	public TestContext TestContext { get; set; }
 
 	#endregion
 
 	#region MultipleGetAsync Tuple Overloads
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleGetAsync_T1T2_ReturnsValue_WhenMapperReturnsTuple() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -537,16 +534,16 @@ public sealed class QueryMultipleAsyncTests {
 				}
 				var orders = (await reader.ReadAsync<OrderDto>()).ToList();
 				return (user, orders);
-			}, cancellationToken: this.TestContext.CancellationToken);
+			}, cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("John", result.Value.Item1.Name);
-		Assert.HasCount(2, result.Value.Item2);
-		Assert.AreEqual(300.0, result.Value.Item2.Sum(o => o.Amount));
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Item1.Name.Should().Be("John");
+		result.Value.Item2.Should().HaveCount(2);
+		result.Value.Item2.Sum(o => o.Amount).Should().Be(300.0);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleGetAsync_T1T2_ReturnsNotFound_WhenMapperReturnsNull() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -570,14 +567,14 @@ public sealed class QueryMultipleAsyncTests {
 				}
 				var orders = (await reader.ReadAsync<OrderDto>()).ToList();
 				return (user, orders);
-			}, cancellationToken: this.TestContext.CancellationToken);
+			}, cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<NotFoundException>(result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<NotFoundException>();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleGetAsync_T1T2T3_ReturnsValue_WhenMapperReturnsTuple() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -609,16 +606,16 @@ public sealed class QueryMultipleAsyncTests {
 				var orders = (await reader.ReadAsync<OrderDto>()).ToList();
 				var count = await reader.ReadSingleOrDefaultAsync<int>();
 				return ((UserDto, IReadOnlyList<OrderDto>, int)?)(user, orders, count);
-			}, cancellationToken: this.TestContext.CancellationToken);
+			}, cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual("John", result.Value.Item1.Name);
-		Assert.HasCount(1, result.Value.Item2);
-		Assert.AreEqual(1, result.Value.Item3);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Item1.Name.Should().Be("John");
+		result.Value.Item2.Should().HaveCount(1);
+		result.Value.Item3.Should().Be(1);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleGetAsync_T1T2_NoParameters_Works() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -640,19 +637,19 @@ public sealed class QueryMultipleAsyncTests {
 				var userCount = await reader.ReadSingleOrDefaultAsync<int>();
 				var orderCount = await reader.ReadSingleOrDefaultAsync<int>();
 				return ((int, int)?)(userCount, orderCount);
-			}, cancellationToken: this.TestContext.CancellationToken);
+			}, cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(2, result.Value.Item1);
-		Assert.AreEqual(0, result.Value.Item2);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Item1.Should().Be(2);
+		result.Value.Item2.Should().Be(0);
 	}
 
 	#endregion
 
 	#region MultipleGetOptionalAsync Tuple Overloads
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleGetOptionalAsync_T1T2_ReturnsOptionalWithValue_WhenMapperReturnsTuple() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -682,16 +679,16 @@ public sealed class QueryMultipleAsyncTests {
 
 				var orders = (await reader.ReadAsync<OrderDto>()).ToList();
 				return ((UserDto, IReadOnlyList<OrderDto>)?)(user, orders);
-			}, cancellationToken: this.TestContext.CancellationToken);
+			}, cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsTrue(result.Value.HasValue);
-		Assert.AreEqual("John", result.Value.Value.Item1.Name);
-		Assert.HasCount(1, result.Value.Value.Item2);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.HasValue.Should().BeTrue();
+		result.Value.Value.Item1.Name.Should().Be("John");
+		result.Value.Value.Item2.Should().HaveCount(1);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleGetOptionalAsync_T1T2_ReturnsEmptyOptional_WhenMapperReturnsNull() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -715,14 +712,14 @@ public sealed class QueryMultipleAsyncTests {
 
 				var orders = (await reader.ReadAsync<OrderDto>()).ToList();
 				return ((UserDto, IReadOnlyList<OrderDto>)?)(user, orders);
-			}, cancellationToken: this.TestContext.CancellationToken);
+			}, cancellationToken: CancellationToken.None);
 
 		// Assert - Success with empty Optional (NOT a failure like MultipleGetAsync)
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsFalse(result.Value.HasValue);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.HasValue.Should().BeFalse();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleGetOptionalAsync_T1T2T3_ReturnsOptionalWithValue_WhenMapperReturnsTuple() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -754,17 +751,17 @@ public sealed class QueryMultipleAsyncTests {
 				var orders = (await reader.ReadAsync<OrderDto>()).ToList();
 				var count = await reader.ReadSingleOrDefaultAsync<int>();
 				return ((UserDto, IReadOnlyList<OrderDto>, int)?)(user, orders, count);
-			}, cancellationToken: this.TestContext.CancellationToken);
+			}, cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsTrue(result.Value.HasValue);
-		Assert.AreEqual("John", result.Value.Value.Item1.Name);
-		Assert.HasCount(1, result.Value.Value.Item2);
-		Assert.AreEqual(1, result.Value.Value.Item3);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.HasValue.Should().BeTrue();
+		result.Value.Value.Item1.Name.Should().Be("John");
+		result.Value.Value.Item2.Should().HaveCount(1);
+		result.Value.Value.Item3.Should().Be(1);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task MultipleGetOptionalAsync_T1T2_NoParameters_Works() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -782,13 +779,13 @@ public sealed class QueryMultipleAsyncTests {
 				var userCount = await reader.ReadSingleOrDefaultAsync<int>();
 				var orderCount = await reader.ReadSingleOrDefaultAsync<int>();
 				return ((int, int)?)(userCount, orderCount);
-			}, cancellationToken: this.TestContext.CancellationToken);
+			}, cancellationToken: CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.IsTrue(result.Value.HasValue);
-		Assert.AreEqual(1, result.Value.Value.Item1);
-		Assert.AreEqual(0, result.Value.Value.Item2);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.HasValue.Should().BeTrue();
+		result.Value.Value.Item1.Should().Be(1);
+		result.Value.Value.Item2.Should().Be(0);
 	}
 
 	#endregion

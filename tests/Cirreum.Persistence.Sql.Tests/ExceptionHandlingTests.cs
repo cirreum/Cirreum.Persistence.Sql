@@ -1,4 +1,4 @@
-namespace Cirreum.Persistence.Sql.Test;
+namespace Cirreum.Persistence.Sql.Tests;
 
 using Cirreum;
 using Cirreum.Exceptions;
@@ -17,7 +17,6 @@ using System.Data;
 /// Constraint violations are translated to appropriate exception types (AlreadyExistsException,
 /// BadRequestException, ConflictException) regardless of the underlying database provider.
 /// </remarks>
-[TestClass]
 public sealed class ExceptionHandlingTests {
 
 	private static (ISqlConnection conn, SqliteConnection rawConn) CreateConnection() {
@@ -45,7 +44,7 @@ public sealed class ExceptionHandlingTests {
 
 	#region Transaction Exception Handling - General Exceptions
 
-	[TestMethod]
+	[Fact]
 	public async Task ExecuteTransactionAsync_WhenActionThrowsException_RollsBackAndReturnsFailure() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -63,21 +62,21 @@ public sealed class ExceptionHandlingTests {
 #pragma warning disable CS0162 // Unreachable code detected
 			return Result.Success;
 #pragma warning restore CS0162
-		}, this.TestContext.CancellationToken);
+		}, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<ApplicationException>(result.Error);
-		Assert.AreEqual("Something went wrong mid-transaction!", result.Error.Message);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<ApplicationException>();
+		result.Error.Message.Should().Be("Something went wrong mid-transaction!");
 
 		// Verify rollback - user should not exist
 		var user = rawConn.QuerySingleOrDefault<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.IsNull(user);
+		user.Should().BeNull();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ExecuteTransactionAsync_Generic_WhenActionThrowsException_RollsBackAndReturnsFailure() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -95,21 +94,21 @@ public sealed class ExceptionHandlingTests {
 #pragma warning disable CS0162 // Unreachable code detected
 			return userId;
 #pragma warning restore CS0162
-		}, this.TestContext.CancellationToken);
+		}, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<InvalidOperationException>(result.Error);
-		Assert.AreEqual("Cannot complete transaction!", result.Error.Message);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<InvalidOperationException>();
+		result.Error.Message.Should().Be("Cannot complete transaction!");
 
 		// Verify rollback - user should not exist
 		var user = rawConn.QuerySingleOrDefault<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.IsNull(user);
+		user.Should().BeNull();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ExecuteTransactionAsync_WhenMapperThrowsInChain_RollsBackAndReturnsFailure() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -127,21 +126,21 @@ public sealed class ExceptionHandlingTests {
 				static User ThrowingMapper() => throw new FormatException("Bad format!");
 				return ThrowingMapper();
 			})
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<FormatException>(result.Error);
-		Assert.AreEqual("Bad format!", result.Error.Message);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<FormatException>();
+		result.Error.Message.Should().Be("Bad format!");
 
 		// Verify rollback - user should not exist
 		var user = rawConn.QuerySingleOrDefault<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.IsNull(user);
+		user.Should().BeNull();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ExecuteTransactionAsync_WhenWherePredicateThrows_RollsBackAndReturnsFailure() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -161,21 +160,21 @@ public sealed class ExceptionHandlingTests {
 					return ThrowingPredicate();
 				},
 				new BadRequestException("Validation failed"))
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<ArithmeticException>(result.Error);
-		Assert.AreEqual("Cannot evaluate predicate!", result.Error.Message);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<ArithmeticException>();
+		result.Error.Message.Should().Be("Cannot evaluate predicate!");
 
 		// Verify rollback - user should not exist
 		var user = rawConn.QuerySingleOrDefault<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.IsNull(user);
+		user.Should().BeNull();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ExecuteTransactionAsync_WhenParametersFactoryThrows_RollsBackAndReturnsFailure() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -194,20 +193,20 @@ public sealed class ExceptionHandlingTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				_ => throw new ArgumentNullException("userId", "Parameters factory failed!"))
 			.ToResult()
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<ArgumentNullException>(result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<ArgumentNullException>();
 
 		// Verify rollback - user should not exist
 		var user = rawConn.QuerySingleOrDefault<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.IsNull(user);
+		user.Should().BeNull();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ExecuteTransactionAsync_WhenResultSelectorThrows_RollsBackAndReturnsFailure() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -221,25 +220,25 @@ public sealed class ExceptionHandlingTests {
 				"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 				new { Id = userId, Name = "John", Email = "john@test.com" },
 				() => throw new InvalidCastException("Result selector failed!"))
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<InvalidCastException>(result.Error);
-		Assert.AreEqual("Result selector failed!", result.Error.Message);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<InvalidCastException>();
+		result.Error.Message.Should().Be("Result selector failed!");
 
 		// Verify rollback - user should not exist
 		var user = rawConn.QuerySingleOrDefault<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.IsNull(user);
+		user.Should().BeNull();
 	}
 
 	#endregion
 
 	#region Transaction SQL Error Handling
 
-	[TestMethod]
+	[Fact]
 	public async Task ExecuteTransactionAsync_WhenSqlSyntaxError_RollsBackAndReturnsFailure() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -257,20 +256,20 @@ public sealed class ExceptionHandlingTests {
 			return await ctx.InsertAsync(
 				"INSRT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)", // INSRT instead of INSERT
 				new { Id = Guid.NewGuid().ToString(), UserId = userId, Amount = 100.0 });
-		}, this.TestContext.CancellationToken);
+		}, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<SqliteException>(result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<SqliteException>();
 
 		// Verify rollback - first user insert should be rolled back too
 		var user = rawConn.QuerySingleOrDefault<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.IsNull(user);
+		user.Should().BeNull();
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task ExecuteTransactionAsync_WhenConstraintViolation_RollsBackAndReturnsFailure() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -291,24 +290,24 @@ public sealed class ExceptionHandlingTests {
 				"UPDATE Users SET Email = @Email WHERE Id = @Id",
 				new { Id = userId2, Email = "existing@test.com" }, // Conflicts with existing user
 				userId2)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert - Constraint violations are translated to AlreadyExistsException regardless of database provider
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<AlreadyExistsException>(result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<AlreadyExistsException>();
 
 		// Verify rollback - new user should not exist
 		var user = rawConn.QuerySingleOrDefault<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId2 });
-		Assert.IsNull(user);
+		user.Should().BeNull();
 	}
 
 	#endregion
 
 	#region Chained Operations Exception Propagation
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChain_WhenMiddleOperationThrows_PropagatesFailureAndStopsChain() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -332,16 +331,16 @@ public sealed class ExceptionHandlingTests {
 				finalOperationExecuted = true;
 				return count;
 			})
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<NotImplementedException>(result.Error);
-		Assert.AreEqual("Middle mapper failed!", result.Error.Message);
-		Assert.IsFalse(finalOperationExecuted, "Operations after failure should not execute");
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<NotImplementedException>();
+		result.Error.Message.Should().Be("Middle mapper failed!");
+		finalOperationExecuted.Should().BeFalse("Operations after failure should not execute");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChain_ExceptionInFirstOperation_PropagatesAndRollsBack() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -363,15 +362,15 @@ public sealed class ExceptionHandlingTests {
 					return new { Id = orderId, UserId = user.Id, Amount = 100.0 };
 				})
 			.ToResult()
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<AccessViolationException>(result.Error);
-		Assert.IsFalse(orderInsertExecuted, "Second operation should not execute after first fails");
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<AccessViolationException>();
+		orderInsertExecuted.Should().BeFalse("Second operation should not execute after first fails");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task FluentChain_MultipleInsertsWithExceptionInMiddle_RollsBackAll() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -399,21 +398,21 @@ public sealed class ExceptionHandlingTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				_ => new { Id = orderId2, UserId = userId, Amount = 200.0 })
 			.ToResult()
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsFailure);
+		result.IsFailure.Should().BeTrue();
 
 		// Verify ALL operations were rolled back
 		var user = rawConn.QuerySingleOrDefault<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { Id = userId });
-		Assert.IsNull(user, "User should be rolled back");
+		user.Should().BeNull("User should be rolled back");
 
 		var order1 = rawConn.QuerySingleOrDefault<OrderDto>(
 			"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 			new { Id = orderId1 });
-		Assert.IsNull(order1, "Order 1 should be rolled back");
+		order1.Should().BeNull("Order 1 should be rolled back");
 	}
 
 	#endregion
@@ -423,8 +422,6 @@ public sealed class ExceptionHandlingTests {
 	private record UserDto(string Id, string Name, string Email);
 	private record User(string Id, string Name, string Email);
 	private record OrderDto(string Id, string UserId, double Amount);
-
-	public TestContext TestContext { get; set; }
 
 	#endregion
 

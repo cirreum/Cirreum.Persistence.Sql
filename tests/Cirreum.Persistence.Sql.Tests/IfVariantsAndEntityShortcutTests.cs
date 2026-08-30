@@ -1,4 +1,4 @@
-namespace Cirreum.Persistence.Sql.Test;
+namespace Cirreum.Persistence.Sql.Tests;
 
 using Cirreum;
 using Cirreum.Exceptions;
@@ -11,10 +11,7 @@ using System.Data;
 /// Tests for If variant methods (ThenInsertIfAsync, ThenUpdateIfAsync, ThenDeleteIfAsync with bool/Func&lt;bool&gt;/Func&lt;T, bool&gt;)
 /// and entity shortcut overloads (InsertAndReturnAsync&lt;TEntity&gt;(sql, entity)).
 /// </summary>
-[TestClass]
 public sealed class IfVariantsAndEntityShortcutTests {
-
-	public TestContext TestContext { get; set; } = null!;
 
 	private static (ISqlConnection conn, SqliteConnection rawConn) CreateConnection() {
 		var connection = new SqliteConnection("Data Source=:memory:");
@@ -47,7 +44,7 @@ public sealed class IfVariantsAndEntityShortcutTests {
 
 	#region DbResult (non-generic) - ThenInsertIfAsync with bool
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_ThenInsertIfAsync_WhenTrue_ExecutesInsert() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -65,15 +62,15 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				() => new { Id = orderId, UserId = userId, Amount = 100.0 },
 				when: true)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var orderCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { Id = orderId });
-		Assert.AreEqual(1L, orderCount);
+		orderCount.Should().Be(1L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_ThenInsertIfAsync_WhenFalse_SkipsInsert() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -91,19 +88,19 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				() => new { Id = orderId, UserId = userId, Amount = 100.0 },
 				when: false)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var orderCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { Id = orderId });
-		Assert.AreEqual(0L, orderCount); // Order should NOT be inserted
+		orderCount.Should().Be(0L); // Order should NOT be inserted
 	}
 
 	#endregion
 
 	#region DbResult (non-generic) - ThenInsertIfAsync with Func<bool>
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_ThenInsertIfAsync_WithFuncTrue_ExecutesInsert() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -122,15 +119,15 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				() => new { Id = orderId, UserId = userId, Amount = 100.0 },
 				when: () => shouldInsert)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var orderCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { Id = orderId });
-		Assert.AreEqual(1L, orderCount);
+		orderCount.Should().Be(1L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_ThenInsertIfAsync_WithFuncFalse_SkipsInsert() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -149,19 +146,19 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				() => new { Id = orderId, UserId = userId, Amount = 100.0 },
 				when: () => shouldInsert)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
+		result.IsSuccess.Should().BeTrue();
 		var orderCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { Id = orderId });
-		Assert.AreEqual(0L, orderCount);
+		orderCount.Should().Be(0L);
 	}
 
 	#endregion
 
 	#region DbResult (non-generic) - ThenInsertIfAndReturnAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_ThenInsertIfAndReturnAsync_WhenTrue_ExecutesAndReturns() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -180,16 +177,16 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				() => new { Id = orderId, UserId = userId, Amount = 100.0 },
 				when: true,
 				resultSelector: () => orderId)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(orderId, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(orderId);
 		var orderCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { Id = orderId });
-		Assert.AreEqual(1L, orderCount);
+		orderCount.Should().Be(1L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_ThenInsertIfAndReturnAsync_WhenFalse_SkipsButStillReturns() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -208,20 +205,20 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				() => new { Id = orderId, UserId = userId, Amount = 100.0 },
 				when: false,
 				resultSelector: () => orderId)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreEqual(orderId, result.Value); // Still returns the value
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().Be(orderId); // Still returns the value
 		var orderCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { Id = orderId });
-		Assert.AreEqual(0L, orderCount); // But no insert happened
+		orderCount.Should().Be(0L); // But no insert happened
 	}
 
 	#endregion
 
 	#region DbResult<T> - ThenInsertIfAsync with bool
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultT_ThenInsertIfAsync_WhenTrue_ExecutesInsert() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -242,16 +239,16 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				u => new { Id = orderId, UserId = u.Id, Amount = 100.0 },
 				when: _ => true)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess, $"Expected success but got failure: {result.Error?.Message}");
-		Assert.AreEqual("John", result.Value.Name); // Pass-through
+		result.IsSuccess.Should().BeTrue($"Expected success but got failure: {result.Error?.Message}");
+		result.Value!.Name.Should().Be("John"); // Pass-through
 		var orderCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { Id = orderId });
-		Assert.AreEqual(1L, orderCount);
+		orderCount.Should().Be(1L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultT_ThenInsertIfAsync_WhenFalse_SkipsInsertPassesThroughValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -272,20 +269,20 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				u => new { Id = orderId, UserId = u.Id, Amount = 100.0 },
 				when: _ => false)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess, $"Expected success but got failure: {result.Error?.Message}");
-		Assert.AreEqual("John", result.Value.Name); // Pass-through still works
+		result.IsSuccess.Should().BeTrue($"Expected success but got failure: {result.Error?.Message}");
+		result.Value!.Name.Should().Be("John"); // Pass-through still works
 		var orderCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { Id = orderId });
-		Assert.AreEqual(0L, orderCount); // No insert
+		orderCount.Should().Be(0L); // No insert
 	}
 
 	#endregion
 
 	#region DbResult<T> - ThenInsertIfAsync with Func<T, bool>
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultT_ThenInsertIfAsync_WithFuncT_WhenPredicateTrue_ExecutesInsert() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -306,16 +303,16 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				u => new { Id = orderId, UserId = u.Id, Amount = 100.0 },
 				when: u => u.IsActive == 1) // Predicate based on fetched value
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess, $"Expected success but got failure: {result.Error?.Message}");
-		Assert.AreEqual("John", result.Value.Name);
+		result.IsSuccess.Should().BeTrue($"Expected success but got failure: {result.Error?.Message}");
+		result.Value!.Name.Should().Be("John");
 		var orderCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { Id = orderId });
-		Assert.AreEqual(1L, orderCount);
+		orderCount.Should().Be(1L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultT_ThenInsertIfAsync_WithFuncT_WhenPredicateFalse_SkipsInsert() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -336,20 +333,20 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				u => new { Id = orderId, UserId = u.Id, Amount = 100.0 },
 				when: u => u.IsActive == 1) // Predicate based on fetched value
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess, $"Expected success but got failure: {result.Error?.Message}");
-		Assert.AreEqual("John", result.Value.Name); // Pass-through still works
+		result.IsSuccess.Should().BeTrue($"Expected success but got failure: {result.Error?.Message}");
+		result.Value!.Name.Should().Be("John"); // Pass-through still works
 		var orderCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { Id = orderId });
-		Assert.AreEqual(0L, orderCount); // No insert because user is inactive
+		orderCount.Should().Be(0L); // No insert because user is inactive
 	}
 
 	#endregion
 
 	#region DbResult<T> - ThenUpdateIfAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultT_ThenUpdateIfAsync_WhenTrue_ExecutesUpdate() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -370,16 +367,16 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				u => new { u.Id, Name = "Jane" },
 				userId,
 				when: _ => true)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess, $"Expected success but got failure: {result.Error?.Message}");
-		Assert.AreEqual("John", result.Value.Name); // Original value passed through
+		result.IsSuccess.Should().BeTrue($"Expected success but got failure: {result.Error?.Message}");
+		result.Value!.Name.Should().Be("John"); // Original value passed through
 		var updatedName = rawConn.ExecuteScalar<string>("SELECT Name FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual("Jane", updatedName); // But DB was updated
+		updatedName.Should().Be("Jane"); // But DB was updated
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultT_ThenUpdateIfAsync_WhenFalse_SkipsUpdate() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -400,16 +397,16 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				u => new { u.Id, Name = "Jane" },
 				userId,
 				when: _ => false)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess, $"Expected success but got failure: {result.Error?.Message}");
-		Assert.AreEqual("John", result.Value.Name);
+		result.IsSuccess.Should().BeTrue($"Expected success but got failure: {result.Error?.Message}");
+		result.Value!.Name.Should().Be("John");
 		var name = rawConn.ExecuteScalar<string>("SELECT Name FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual("John", name); // NOT updated
+		name.Should().Be("John"); // NOT updated
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultT_ThenUpdateIfAsync_WithFuncT_BasedOnValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -430,19 +427,19 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				u => new { u.Id, Name = "Updated" },
 				userId,
 				when: u => u.Name.StartsWith('J'))
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess, $"Expected success but got failure: {result.Error?.Message}");
+		result.IsSuccess.Should().BeTrue($"Expected success but got failure: {result.Error?.Message}");
 		var name = rawConn.ExecuteScalar<string>("SELECT Name FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual("Updated", name); // Updated because name started with "J"
+		name.Should().Be("Updated"); // Updated because name started with "J"
 	}
 
 	#endregion
 
 	#region DbResult<T> - ThenDeleteIfAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultT_ThenDeleteIfAsync_WhenTrue_ExecutesDelete() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -466,16 +463,16 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				o => new { o.Id },
 				orderId,
 				when: _ => true)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess, $"Expected success but got failure: {result.Error?.Message}");
-		Assert.AreEqual(orderId, result.Value.Id); // Value passed through
+		result.IsSuccess.Should().BeTrue($"Expected success but got failure: {result.Error?.Message}");
+		result.Value!.Id.Should().Be(orderId); // Value passed through
 		var orderCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { Id = orderId });
-		Assert.AreEqual(0L, orderCount); // Deleted
+		orderCount.Should().Be(0L); // Deleted
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultT_ThenDeleteIfAsync_WhenFalse_SkipsDelete() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -499,15 +496,15 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				o => new { o.Id },
 				orderId,
 				when: _ => false)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess, $"Expected success but got failure: {result.Error?.Message}");
+		result.IsSuccess.Should().BeTrue($"Expected success but got failure: {result.Error?.Message}");
 		var orderCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { Id = orderId });
-		Assert.AreEqual(1L, orderCount); // NOT deleted
+		orderCount.Should().Be(1L); // NOT deleted
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultT_ThenDeleteIfAsync_WithFuncT_BasedOnValue() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -531,19 +528,19 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				o => new { o.Id },
 				orderId,
 				when: o => o.Amount > 50)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess, $"Expected success but got failure: {result.Error?.Message}");
+		result.IsSuccess.Should().BeTrue($"Expected success but got failure: {result.Error?.Message}");
 		var orderCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { Id = orderId });
-		Assert.AreEqual(0L, orderCount); // Deleted because Amount > 50
+		orderCount.Should().Be(0L); // Deleted because Amount > 50
 	}
 
 	#endregion
 
 	#region ThenUpdateIfAndReturnAsync / ThenDeleteIfAndReturnAsync
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultT_ThenUpdateIfAndReturnAsync_WhenTrue_UpdatesAndReturns() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -565,16 +562,16 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				userId,
 				when: _ => true,
 				resultSelector: u => $"Updated {u.Name}")
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess, $"Expected success but got failure: {result.Error?.Message}");
-		Assert.AreEqual("Updated John", result.Value);
+		result.IsSuccess.Should().BeTrue($"Expected success but got failure: {result.Error?.Message}");
+		result.Value.Should().Be("Updated John");
 		var name = rawConn.ExecuteScalar<string>("SELECT Name FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual("Jane", name);
+		name.Should().Be("Jane");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultT_ThenUpdateIfAndReturnAsync_WhenFalse_SkipsButStillReturns() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -596,16 +593,16 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				userId,
 				when: _ => false,
 				resultSelector: u => $"Skipped {u.Name}")
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess, $"Expected success but got failure: {result.Error?.Message}");
-		Assert.AreEqual("Skipped John", result.Value); // resultSelector still called
+		result.IsSuccess.Should().BeTrue($"Expected success but got failure: {result.Error?.Message}");
+		result.Value.Should().Be("Skipped John"); // resultSelector still called
 		var name = rawConn.ExecuteScalar<string>("SELECT Name FROM Users WHERE Id = @Id", new { Id = userId });
-		Assert.AreEqual("John", name); // NOT updated
+		name.Should().Be("John"); // NOT updated
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultT_ThenDeleteIfAndReturnAsync_WhenTrue_DeletesAndReturns() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -630,20 +627,20 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				orderId,
 				when: _ => true,
 				resultSelector: o => $"Deleted order {o.Amount}")
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess, $"Expected success but got failure: {result.Error?.Message}");
-		Assert.AreEqual("Deleted order 100", result.Value);
+		result.IsSuccess.Should().BeTrue($"Expected success but got failure: {result.Error?.Message}");
+		result.Value.Should().Be("Deleted order 100");
 		var orderCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { Id = orderId });
-		Assert.AreEqual(0L, orderCount);
+		orderCount.Should().Be(0L);
 	}
 
 	#endregion
 
 	#region Entity Shortcut Overloads - DbContext.InsertAndReturnAsync<TEntity>(sql, entity)
 
-	[TestMethod]
+	[Fact]
 	public async Task DbContext_InsertAndReturnAsync_EntityShortcut_UsesEntityAsParamsAndReturn() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -656,19 +653,19 @@ public sealed class IfVariantsAndEntityShortcutTests {
 			ctx.InsertAndReturnAsync(
 				"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 				user)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreSame(user, result.Value); // Same instance returned
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().BeSameAs(user); // Same instance returned
 		var dbUser = rawConn.QuerySingleOrDefault<UserDto>(
 			"SELECT Id, Name, Email FROM Users WHERE Id = @Id",
 			new { user.Id });
-		Assert.IsNotNull(dbUser);
-		Assert.AreEqual("John", dbUser.Name);
+		dbUser.Should().NotBeNull();
+		dbUser.Name.Should().Be("John");
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbContext_InsertAndReturnAsync_EntityShortcut_HandlesConstraintViolation() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -685,18 +682,18 @@ public sealed class IfVariantsAndEntityShortcutTests {
 			ctx.InsertAndReturnAsync(
 				"INSERT INTO Users (Id, Name, Email) VALUES (@Id, @Name, @Email)",
 				duplicateUser)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert - Constraint violations are translated to AlreadyExistsException regardless of database provider
-		Assert.IsTrue(result.IsFailure);
-		Assert.IsInstanceOfType<AlreadyExistsException>(result.Error);
+		result.IsFailure.Should().BeTrue();
+		result.Error.Should().BeOfType<AlreadyExistsException>();
 	}
 
 	#endregion
 
 	#region Entity Shortcut Overloads - DbResult.ThenInsertAndReturnAsync<TEntity>(sql, entity)
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_ThenInsertAndReturnAsync_EntityShortcut_Works() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -713,23 +710,23 @@ public sealed class IfVariantsAndEntityShortcutTests {
 			.ThenInsertAndReturnAsync(
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				order)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreSame(order, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().BeSameAs(order);
 		var dbOrder = rawConn.QuerySingleOrDefault<OrderDto>(
 			"SELECT Id, UserId, Amount FROM Orders WHERE Id = @Id",
 			new { order.Id });
-		Assert.IsNotNull(dbOrder);
-		Assert.AreEqual(150.0, dbOrder.Amount);
+		dbOrder.Should().NotBeNull();
+		dbOrder.Amount.Should().Be(150.0);
 	}
 
 	#endregion
 
 	#region Entity Shortcut Overloads - DbResult.ThenInsertIfAndReturnAsync<TEntity>
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_ThenInsertIfAndReturnAsync_EntityShortcut_WhenTrue_Inserts() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -747,16 +744,16 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				order,
 				when: true)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreSame(order, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().BeSameAs(order);
 		var orderCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { order.Id });
-		Assert.AreEqual(1L, orderCount);
+		orderCount.Should().Be(1L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_ThenInsertIfAndReturnAsync_EntityShortcut_WhenFalse_SkipsButReturnsEntity() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -774,16 +771,16 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				order,
 				when: false)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreSame(order, result.Value); // Entity still returned
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().BeSameAs(order); // Entity still returned
 		var orderCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { order.Id });
-		Assert.AreEqual(0L, orderCount); // But not inserted
+		orderCount.Should().Be(0L); // But not inserted
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResult_ThenInsertIfAndReturnAsync_EntityShortcut_WithFuncBool() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -802,20 +799,20 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				order,
 				when: () => shouldInsert)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess);
-		Assert.AreSame(order, result.Value);
+		result.IsSuccess.Should().BeTrue();
+		result.Value.Should().BeSameAs(order);
 		var orderCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { order.Id });
-		Assert.AreEqual(1L, orderCount);
+		orderCount.Should().Be(1L);
 	}
 
 	#endregion
 
 	#region Entity Shortcut Overloads - DbResult<T>.ThenInsertIfAndReturnAsync<TEntity>
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultT_ThenInsertIfAndReturnAsync_EntityShortcut_WithFuncT() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -836,16 +833,16 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				order,
 				when: u => u.IsActive == 1)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess, $"Expected success but got failure: {result.Error?.Message}");
-		Assert.AreSame(order, result.Value);
+		result.IsSuccess.Should().BeTrue($"Expected success but got failure: {result.Error?.Message}");
+		result.Value.Should().BeSameAs(order);
 		var orderCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { order.Id });
-		Assert.AreEqual(1L, orderCount);
+		orderCount.Should().Be(1L);
 	}
 
-	[TestMethod]
+	[Fact]
 	public async Task DbResultT_ThenInsertIfAndReturnAsync_EntityShortcut_WithFuncT_WhenFalse() {
 		// Arrange
 		var (conn, rawConn) = CreateConnection();
@@ -866,13 +863,13 @@ public sealed class IfVariantsAndEntityShortcutTests {
 				"INSERT INTO Orders (Id, UserId, Amount) VALUES (@Id, @UserId, @Amount)",
 				order,
 				when: u => u.IsActive == 1)
-		, this.TestContext.CancellationToken);
+		, CancellationToken.None);
 
 		// Assert
-		Assert.IsTrue(result.IsSuccess, $"Expected success but got failure: {result.Error?.Message}");
-		Assert.AreSame(order, result.Value); // Entity still returned
+		result.IsSuccess.Should().BeTrue($"Expected success but got failure: {result.Error?.Message}");
+		result.Value.Should().BeSameAs(order); // Entity still returned
 		var orderCount = rawConn.ExecuteScalar<long>("SELECT COUNT(*) FROM Orders WHERE Id = @Id", new { order.Id });
-		Assert.AreEqual(0L, orderCount); // But not inserted because user is inactive
+		orderCount.Should().Be(0L); // But not inserted because user is inactive
 	}
 
 	#endregion
