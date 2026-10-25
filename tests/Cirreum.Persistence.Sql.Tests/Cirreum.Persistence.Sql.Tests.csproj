@@ -23,7 +23,7 @@
 	<ItemGroup Label="Test fixtures">
 		<!-- The SQLite-backed integration suite runs against a real in-memory database. -->
 		<PackageReference Include="Dapper" Version="2.1.89" />
-		<PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.13" />
+		<PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.14" />
 	</ItemGroup>
 
 	<ItemGroup>
